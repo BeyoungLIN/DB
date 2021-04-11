@@ -2,9 +2,9 @@
 export CUDA_VISIBLE_DEVICES=1
 
 python special_demo.py \
-experiments/seg_detector/fakepages_resnet18_deform_thre.yaml \
---image_path /disks/sdb/euphoria/deep-text-recognition-benchmark/dataset/CUHK_OCR/tif \
+experiments/seg_detector/fakepages_resnet50_deform_thre.yaml \
+--image_path /disks/sdb/euphoria/CUHK_OCR/3.17竞赛数据/测试图片 \
 --resume \
-models/model_epoch_490_minibatch_396000 \
+/disks/sdc/projs/AncientBooks/models/db/fakepage_res50_iter3.bin \
 --box_thresh 0.5 \
 --sort_boxes \
