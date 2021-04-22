@@ -1,5 +1,5 @@
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 
 python demo.py \
 experiments/seg_detector/fakepages0310_resnet50_deform_thre.yaml \
@@ -9,4 +9,4 @@ experiments/seg_detector/fakepages0310_resnet50_deform_thre.yaml \
 --resume \
 /disks/sdc/projs/AncientBooks/models/db/fakepage_res50_iter3.bin \
 --box_thresh 0.5 \
---result_dir /disks/sdb/euphoria/pkg/seg_detector/CUHK_0322_demo_results_newdb \
+--result_dir /disks/sdc/euphoria/Dingxiu_db_test/Dingxiu_2_demo_results_res50_2/CUHK_0322_demo_results_newdb \
