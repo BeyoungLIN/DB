@@ -2,7 +2,7 @@
 export CUDA_VISIBLE_DEVICES=1
 
 python demo.py \
-experiments/seg_detector/fakepages_resnet18_deform_thre.yaml \
+experiments/seg_detector/fakepages_resnet50_deform_thre.yaml \
 --image_path /disks/sdb/euphoria/CUHK_OCR/3.22竞赛数据/imgs/ \
 --visualize \
 --sort_boxes \
