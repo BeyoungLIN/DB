@@ -1,0 +1,4 @@
+exp = os.path.join(ROOT_PATH_DETECTOR, 'experiments/seg_detector/fakepages0310_resnet50_deform_thre.yaml')
+resume = os.path.join(ROOT_PATH_DETECTOR, models/fakepage_res50_iter2.bin)
+image_path = os.path.join(ROOT_PATH_DETECTOR, './datasets/book_pages_fz2_aug_jingbu_2w/')
+resume = os.path.join(ROOT_PATH_DETECTOR,models/fakepage_res50_iter2.bin)

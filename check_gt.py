@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 
 import utils
+# import utils.cv2read
 
 
 def parse_args():
@@ -65,4 +66,5 @@ if __name__ == '__main__':
                 # cv2.imshow('img', img)
                 # cv2.waitKey(0)
                 # cv2.imwrite(os.path.join(args.gt, os.path.splitext(img_name)[0] + '_check.jpg'), img)
+                # print(os.path.join(args.gt, os.path.splitext(img_name)[0] + '_check.jpg'))
                 utils.cv2save(img, os.path.join(args.gt, os.path.splitext(img_name)[0] + '_check.jpg'))

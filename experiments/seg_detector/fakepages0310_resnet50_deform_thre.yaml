@@ -1,5 +1,5 @@
 import:
-  - 'experiments/seg_detector/base_mutil_gen_0311.yaml'
+  - 'experiments/seg_detector/base_mutil_gen_0311_test.yaml'
 package: [ ]
 define:
   - name: 'Experiment'
@@ -65,7 +65,7 @@ define:
           collect_fn:
             class: ICDARCollectFN
       visualize: false
-      interval: 4500
+      interval: 10
       exempt: 1
 
     logger:
