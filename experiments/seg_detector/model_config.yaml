@@ -1,4 +1,24 @@
+# res1.8
+exp = os.path.join(ROOT_PATH_DETECTOR, 'experiments/seg_detector/fakepages_resnet18_deform_thre.yaml')
+resume = os.path.join(ROOT_PATH_DETECTOR, 'models/fakepage_res18_iter2.bin')
+image_short_side = 736
+box_thresh = 0.5
+visualize = True
+sort_boxes = True
+
+# res50-2
+exp = os.path.join(ROOT_PATH_DETECTOR, 'experiments/seg_detector/fakepages_resnet50_deform_thre.yaml')
+resume = os.path.join(ROOT_PATH_DETECTOR, 'models/fakepage_res50_iter2.bin')
+image_short_side = 736
+box_thresh = 0.5
+visualize = True
+sort_boxes = True
+
+# res50-3
 exp = os.path.join(ROOT_PATH_DETECTOR, 'experiments/seg_detector/fakepages0310_resnet50_deform_thre.yaml')
-resume = os.path.join(ROOT_PATH_DETECTOR, models/fakepage_res50_iter2.bin)
-image_path = os.path.join(ROOT_PATH_DETECTOR, './datasets/book_pages_fz2_aug_jingbu_2w/')
-resume = os.path.join(ROOT_PATH_DETECTOR,models/fakepage_res50_iter2.bin)
+resume = os.path.join(ROOT_PATH_DETECTOR, 'models/fakepage_res50_iter3.5.bin')
+image_short_side = 736
+box_thresh = 0.5
+visualize = True
+sort_boxes = True
+
