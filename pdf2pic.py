@@ -5,8 +5,9 @@
 # @File   : pdf2pic.py
 
 import PyPDF4
-import pikepdf
 import fitz
+import pikepdf
+from PIL import Image
 
 
 # 对pdf文件进行简单的解密
@@ -25,7 +26,7 @@ def jiemi(pdfpath):
     # 将每一页转化为图片并保存
 
 
-def pdf_image(pdf_name):
+def pdf_image(pdf_name, convert=False):
     img_paths = []
     pdf = fitz.Document(pdf_name)
     for i, pg in enumerate(range(0, pdf.pageCount)):
@@ -36,7 +37,14 @@ def pdf_image(pdf_name):
         img_path = pdf_name[:-4] + '_' + str(pg + 1) + '.jpg'
         pm.writePNG(img_path)  # 保存图片
         img_paths.append(img_path)
+
+        if convert:
+            img = Image.open(img_path)
+            # img.show()
+            low = img.convert('L')
+            low.save(img_path)
+
     pdf.close()
     return img_paths
 
-# pdf_image('/Users/Beyoung/Desktop/Projects/AC_OCR/金陵诗徵/金陵诗徵 44巻 ; 国朝金陵诗徵 48巻 . 续金陵诗徵 6巻_副本.pdf')
+pdf_image('/Users/Beyoung/Desktop/Projects/AC_OCR/金陵诗徵/金陵诗徵 44巻 ; 国朝金陵诗徵 48巻 . 续金陵诗徵 6巻_副本.pdf', convert=False)
