@@ -26,7 +26,7 @@ def jiemi(pdfpath):
     # 将每一页转化为图片并保存
 
 
-def pdf_image(pdf_name, convert=False):
+def pdf_image(pdf_name, Gray=False):
     img_paths = []
     pdf = fitz.Document(pdf_name)
     for i, pg in enumerate(range(0, pdf.pageCount)):
@@ -38,13 +38,21 @@ def pdf_image(pdf_name, convert=False):
         pm.writePNG(img_path)  # 保存图片
         img_paths.append(img_path)
 
-        if convert:
+        if Gray:  # 是否转为灰度
             img = Image.open(img_path)
             # img.show()
             low = img.convert('L')
             low.save(img_path)
 
+            '''
+            这种模式转换的灰度图片size比较大
+            img = cv2.imread(img_path, 0)
+            # cv2.imshow("img", img)
+            cv2.imwrite(img_path, img)
+            '''
+
     pdf.close()
     return img_paths
 
-pdf_image('/Users/Beyoung/Desktop/Projects/AC_OCR/金陵诗徵/金陵诗徵 44巻 ; 国朝金陵诗徵 48巻 . 续金陵诗徵 6巻_副本.pdf', convert=False)
+
+pdf_image('/Users/Beyoung/Desktop/Projects/AC_OCR/金陵诗徵/金陵诗徵 44巻 ; 国朝金陵诗徵 48巻 . 续金陵诗徵 6巻_副本.pdf', Gray=True)
