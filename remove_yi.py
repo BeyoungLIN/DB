@@ -20,7 +20,6 @@ def wash_redun(source_path, tar_path):
                 #     print(line[:-2])
                 #     with open(tar_path, 'a') as of:
                 #         of.write(line[:-2])
-
                 # else:
                 print(line)
                 with open(tar_path, 'a') as of:
@@ -32,7 +31,7 @@ def wash_redun(source_path, tar_path):
 # input_path = '/Volumes/ExtremeSSD/金陵诗徵/金陵诗徵44巻_gray/output/金陵诗徵44巻_4149_res_recog.txt'
 # output_path = input_path + 'washed'
 
-root_path = '/Users/Beyoung/Desktop/Projects/AC_OCR/金陵诗徵44巻_recog_res'
+root_path = 'AC_OCR/金陵诗徵44巻_recog_res'
 output_path = root_path + '_washed'
 if not os.path.exists(output_path):
     os.mkdir(output_path)
