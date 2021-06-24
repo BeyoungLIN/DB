@@ -55,4 +55,4 @@ def pdf_image(pdf_name, Gray=False):
     return img_paths
 
 
-pdf_image('/Users/Beyoung/Desktop/Projects/AC_OCR/金陵诗徵/金陵诗徵 44巻 ; 国朝金陵诗徵 48巻 . 续金陵诗徵 6巻_副本.pdf', Gray=True)
+pdf_image('/Users/Beyoung/Desktop/Projects/AC_OCR/宝庆/宝庆.pdf', Gray=True)

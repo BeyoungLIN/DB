@@ -5,24 +5,25 @@
 # @File   : jinling_test.py
 
 import os
-
-from pdf2pic import pdf_image
-from test_api_v0 import main1
 import time
 
-def time_change(time_init):   #定义将秒转换为时分秒格式的函数
+from pdf2pic import pdf_image
+from test_api_v0 import ajust_boxes
+
+
+def time_change(time_init):  # 定义将秒转换为时分秒格式的函数
     time_list = []
-    if time_init/3600 > 1:
-        time_h = int(time_init/3600)
-        time_m = int((time_init-time_h*3600) / 60)
+    if time_init / 3600 > 1:
+        time_h = int(time_init / 3600)
+        time_m = int((time_init - time_h * 3600) / 60)
         time_s = int(time_init - time_h * 3600 - time_m * 60)
         time_list.append(str(time_h))
         time_list.append('h ')
         time_list.append(str(time_m))
         time_list.append('m ')
 
-    elif time_init/60 > 1:
-        time_m = int(time_init/60)
+    elif time_init / 60 > 1:
+        time_m = int(time_init / 60)
         time_s = int(time_init - time_m * 60)
         time_list.append(str(time_m))
         time_list.append('m ')
@@ -33,6 +34,7 @@ def time_change(time_init):   #定义将秒转换为时分秒格式的函数
     time_list.append('s')
     time_str = ''.join(time_list)
     return time_str
+
 
 '''
 if __name__=="__main__":
@@ -58,6 +60,7 @@ if __name__=="__main__":
             process = process + 0.01
 '''
 
+
 def pdf_test():
     pdf_image('/Volumes/ExtremeSSD/金陵诗徵/金陵诗徵44巻.pdf', Gray=True)
     dirpath = '/Volumes/ExtremeSSD/金陵诗徵'
@@ -68,7 +71,7 @@ def pdf_test():
         if file.endswith('.jpg'):
             flag += 1
             print(file + ' processing: ' + str(round(flag / len(dirs) * 100, 2)) + ' %')
-            main1(os.path.join(dirpath, file))
+            ajust_boxes(os.path.join(dirpath, file))
     return
 
 
@@ -80,9 +83,7 @@ def folder_test(dirpath):
     # process = .01
     start = time.time()
     for file in files:
-        # if file.endswith('.tif'):
         if os.path.splitext(file)[1].lower() in IMG_EXT:
-            # print(file + ' processing: ' + str(round(flag / len(files) * 100, 2)) + ' %')
             flag += 1
             process = flag / len(files)
             # if process < (flag * 1.0 / len(files)):
@@ -90,19 +91,33 @@ def folder_test(dirpath):
             end = time.time()
             use_time = end - start
 
-            all_time = use_time / process
-            res_time = all_time - use_time
+            rest_file = len(files) - flag
+            res_time = rest_file * use_time
+
+            # all_time = use_time / process
+            # res_time = all_time - use_time
             str_ues_time = time_change(use_time)
             str_res_time = time_change(res_time)
 
-            main1(os.path.join(dirpath, file))
-            print(file + " processing: %.0f%%   Used time:%s   Rest time:%s " % ( process * 100, str_ues_time, str_res_time))
-            # process = process + 0.01
+            '''
+            此处需要优化剩余时长代码,改为 记录单个文件处理时间, 乘以剩余的文件
+            '''
+
+            if os.path.exists(os.path.join(dirpath, 'output', os.path.splitext(file)[0]) + '_res_recog.txt'):
+                pass
+            else:
+                # print(file + ' processing: ' + str(round(flag / len(files) * 100, 2)) + ' %')
+
+                # main1(os.path.join(dirpath, file))
+                ajust_boxes((os.path.join(dirpath, file)), dbg=False)
+                print(file + " processing: %.0f%%   Used time:%s   Rest time:%s " % (
+                    process * 100, str_ues_time, str_res_time))
+                # process = process + 0.01
 
     return
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     IMG_EXT = {'.jpg', '.png', '.tif', '.tiff', '.bmp', '.gif'}
     #
     # root_dir = '/Users/Beyoung/Desktop/Projects/AC_OCR/OCR测试图像2'

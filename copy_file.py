@@ -6,8 +6,8 @@
 
 import os
 
-source_path = '/Volumes/ExtremeSSD/金陵诗徵/output'
-target_path = '/Volumes/ExtremeSSD/金陵诗徵/金陵诗徵44巻_rec'
+source_path = '/Volumes/ExtremeSSD/金陵诗徵/金陵诗徵44巻_gray/output'
+target_path = '/Volumes/ExtremeSSD/金陵诗徵/金陵诗徵44巻_gray_rec'
 
 for file in os.listdir(source_path):
     if file.endswith('res_recog.txt'):
