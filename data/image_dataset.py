@@ -9,7 +9,7 @@ import glob
 from concern.config import Configurable, State
 import math
 
-
+# 图片数据集
 class ImageDataset(data.Dataset, Configurable):
     r'''Dataset reading from images.
     Args:
@@ -45,7 +45,6 @@ class ImageDataset(data.Dataset, Configurable):
                 print('data dir: ', self.data_dir[i])
                 if 'TD500' in self.data_list[i] \
                         or 'total_text' in self.data_list[i] \
-                        or 'Fakepages_compiled' in self.data_list[i] \
                         or 'book_pages' in self.data_list[i]:
                     gt_path = [self.data_dir[i] + '/test_gts/' + timg.strip() + '.txt' for timg in image_list]
                 else:

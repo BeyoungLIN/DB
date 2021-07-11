@@ -8,6 +8,8 @@ import PyPDF4
 import fitz
 import pikepdf
 from PIL import Image
+import os
+import time
 
 
 # 对pdf文件进行简单的解密
@@ -34,7 +36,11 @@ def pdf_image(pdf_name, Gray=False):
         trans = fitz.Matrix(3.0, 3.0).preRotate(0)
         pm = page.getPixmap(matrix=trans, alpha=False)  # 获得每一页的流对象
         # pm.writePNG(dir_name + os.sep + base_name[:-4] + '_' + '{:0>3d}.png'.format(pg + 1))  # 保存图片
+        # if not os.path.exists(pdf_name[:-4]):
+        #     os.makedirs(pdf_name[:-4])
+
         img_path = pdf_name[:-4] + '_' + str(pg + 1) + '.jpg'
+        # print(pdf_name[:-4], pdf_name[:-4] + '_' + str(pg + 1) + '.jpg')
         pm.writePNG(img_path)  # 保存图片
         img_paths.append(img_path)
 
@@ -55,4 +61,18 @@ def pdf_image(pdf_name, Gray=False):
     return img_paths
 
 
-pdf_image('/Users/Beyoung/Desktop/Projects/AC_OCR/宝庆/宝庆.pdf', Gray=True)
+
+root_list = [
+    '/Users/Beyoung/Desktop/Projects/AC_OCR/國家圖書館藏敦煌遺書_001.pdf',
+    '/Users/Beyoung/Desktop/Projects/AC_OCR/2563[函368].pdf',
+    '/Users/Beyoung/Desktop/Projects/AC_OCR/纂図互註荀子3.pdf',
+    # '/disks/sde/beyoung/files_processor/6059.桐南凤岗李氏宗谱：三十二卷：[桐庐]',
+]
+
+for root in root_list:
+    start_time = time.time()
+    pdf_image(root, Gray=True)
+    # sin_folders(root)
+    end_time = time.time()
+    used_time = end_time - start_time
+    print(root + '\n处理时间', used_time)
