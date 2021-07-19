@@ -33,7 +33,7 @@ def main():
     parser.add_argument('--polygon', action='store_true',
                         help='output polygons if true')
     parser.add_argument('--eager', '--eager_show', action='store_true', dest='eager_show',
-                        help='Show iamges eagerly')
+                        help='Show images eagerly')
     parser.add_argument('--sort_boxes', action='store_true', dest='sort_boxes',
                         help='Sort boxes for further works')
 
@@ -164,7 +164,7 @@ class Demo:
                         cluster_recs.append([recs[box_id] for box_id in box_ids])
                     classified_recs = sorted(cluster_recs, key=utils.list_sort, reverse=True)
                     classified_recs = [sorted(l, key=utils.box_sort, reverse=False) for l in classified_recs]
-                    output_recs = utils.read_out(classified_recs, recs)
+                    output_recs = utils.read_out_2(classified_recs, recs)
                     output_idxs = []
                     for rec in output_recs:
                         output_idxs.append(rec.idx)
