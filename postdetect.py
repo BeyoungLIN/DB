@@ -240,7 +240,8 @@ def union_2box(box1, box2, cords_db):
     xmin2, ymin2, xmax2, ymax2 = box2[0], box2[1], box2[2], box2[3]
     xmin, ymin = min(xmin1, xmin2), min(ymin1, ymin2)
     xmax, ymax = max(xmax1, xmax2), max(ymax1, ymax2)
-
+    
+    '''  
     # 判断是否只有cord_craft成员
     if box1 in cords_db and not box2 in cords_db:
         _xmin,_ymin, _xmax,_ymax = xmin1, ymin1, xmax1, ymax1
@@ -252,6 +253,13 @@ def union_2box(box1, box2, cords_db):
         # if ymax-ymin > _ymax-_ymin: _ymax, _ymin = ymax, ymin
         # if _xmin > xmin and _xmax < xmax: _xmin, _xman = xmin, xmax
         return _xmin,_ymin, _xmax,_ymax
+'''
+    if box2 in cords_db:
+        ymin, ymax = ymin2, ymax2
+        if ymin1<ymin and ymax1>ymax:
+            ymin, ymax = ymin1, ymax1
+    if not (box2 in cords_db)  and not ( ymin2<ymin1 and ymax2>ymax1 ):
+        ymin, ymax = ymin1, ymax1
     return [xmin,ymin, xmax,ymax]
 
 def union_subboxes(sub_boxes, cords_db, minDot, URatio=0.6):
@@ -271,10 +279,10 @@ def union_subboxes(sub_boxes, cords_db, minDot, URatio=0.6):
 
             if interacted:
                 # print('ly_inter/ly_boxu:\t{}'.format(ly_inter/ly_boxu))
+                # if not sub_box in cords_db:
+                inter_u.append(sub_box)
                 if (ly_inter/ly_boxu) < 0.08:
                     continue
-                if not sub_box in cords_db:
-                    inter_u.append(sub_box)
                 if ly_subbox < lx_subbox and \
                    ((lx_inter/lx_subbox) < URatio or (lx_inter/lx_boxu) < URatio ): 
                     continue
@@ -319,8 +327,9 @@ def ygroup_uboxes(_uboxes, minDot):
     _cords = _uboxes
     # 7.0 竖向坐标缩放0.9
     # 高度缩放比例， RESIZE_Y 参数配置
-    RESIZE_Y = 0.9
-    _cords = [ list(scale_y(_cord, RESIZE_Y)) for _cord in _cords ]
+    # RESIZE_Y = 0.9
+    # _cords = [ list(scale_y(_cord, RESIZE_Y)) for _cord in _cords ]
+
     # 7.1 竖向分组
     # liney [xmin-2, ymin, xmin-2, ymax]
     lines_y = [[c_d[0]+1, c_d[1], c_d[0]+1, c_d[3]]  for c_d in _cords]
@@ -335,6 +344,117 @@ def ygroup_uboxes(_uboxes, minDot):
 
     return ygrp_uboxes, ulines_y
 
+def isinter2plus(cord, cords_db_orig_, minDot):
+    intercount = 0
+    cord1 = xmin,ymin,xmax,ymax = cord[0], cord[1], cord[2], cord[3]  # craft左上,右下
+    for cord_ in cords_db_orig_:
+        cord2 = xmin_,ymin_,xmax_,ymax_ = cord_[0], cord_[1], cord_[2], cord_[3]  # db左上, 右下
+        if rec_interact(cord1, cord2, minDot)[0]:
+            intercount += 1
+    return intercount>=2
+
+def rng_interact(rng1, rng2):
+    interacted = False
+    xmin1, xmax1 = rng1[0], rng1[1]
+    xmin2, xmax2 = rng2[0], rng2[1]
+    if xmin1 <= xmax2 and xmin2 <= xmax1: interacted = True
+    rng_u = [ min(xmin1, xmin2), max(xmax1, xmax2)]
+    return interacted, rng_u
+
+
+def get_w_rngs(widths, R=0.04):
+    w_sorted = sorted(widths)
+    w_rngs_tmp = [ [w*(1-R), w*(1+R)] for w in w_sorted ]
+    w_rngs, w_rng = [], w_rngs_tmp.pop(0)
+    for _rng in w_rngs_tmp:
+        interacted, rng_u = rng_interact(w_rng, _rng)
+        if interacted:
+            w_rng = rng_u
+        else:
+            w_rngs.append(w_rng)
+            w_rng = _rng
+    w_rngs.append(w_rng)
+    return w_rngs
+
+def get_line_size(w_rngs, w):
+    sizes = ['S','M','L','XL','XXL','XXXL']
+    l_sizes = len(sizes)
+    for i, rng in enumerate(w_rngs):
+        rngl, rngr = rng[0], rng[1]
+        if rngl <= w <= rngr:
+            if i >= l_sizes: return sizes[-1]
+            return sizes[i]
+    return sizes[-1]
+
+def re_mapping_lsize(res4api_detect_line):
+    # sizes = ['S','M','L','XL','XXL','XXXL']
+    sizes = ['XXXL','XXL','XL','L','M','S']
+    boxgrp_w = {s:{'avg_w':0,'widths':[],'cnt':0} for s in sizes}
+    for i, r_line in enumerate(res4api_detect_line):
+        box_line = r_line['box']
+        x1,y1, x2,y2, x3,y3, x4,y4 = [ int(cord) for cord in box_line] 
+        min_x, max_x = round((x1+x4)/2), round((x2+x3)/2)
+        width_line = abs(max_x - min_x)
+
+        line_size = r_line['size']
+        boxgrp_w[line_size]['widths'].append(width_line)
+        boxgrp_w[line_size]['cnt'] += 1
+    
+    # 各size数量， 各数量对应size及属性
+    cnts_size, cnt_grp = [],{}
+    for size, boxgrp in boxgrp_w.items():
+        _cnt = boxgrp['cnt']
+        if _cnt == 0: continue
+        cnts_size.append(_cnt)
+        boxgrp['avg_w'] = np.mean(boxgrp['widths'])
+        cnt_grp[_cnt] = boxgrp
+        cnt_grp[_cnt]['size'] = size
+    cnts_size.sort(reverse=True)
+    
+    # 求S_size和L_size, 后面进行替换为'S', 'L'
+    if len(cnts_size) == 1:
+        # 所有 r_line['size']设置为S
+        for i, r_line in enumerate(res4api_detect_line):
+            r_line['size'] = 'S'
+        return
+    c1,c2 = cnts_size[0], cnts_size[1]
+    top1,top2 = cnt_grp[c1], cnt_grp[c2]
+    top1_size, top2_size = top1['size'], top2['size']
+    top1_w, top2_w = top1['avg_w'], top2['avg_w']
+
+    # S_size, S_w; L_size, L_w
+    S_size, S_w = (top1_size, top1_w) if top1_w < top2_w else (top2_size, top2_w)
+    top2s = [(top1_size,top1_w), (top2_size,top2_w)]
+    top2s.remove((S_size,S_w))
+    L_size, L_w = top2s[0]
+
+    # 重选 L_size, L_w
+    for s in sizes:
+        _cnt = boxgrp_w[s]['cnt']
+        if _cnt>0:
+            L_size, L_w = s, boxgrp_w[s]['avg_w']
+            break
+    S_grp, L_grp = [S_size], [L_size]
+    
+    for size, boxgrp in boxgrp_w.items():
+        if boxgrp['cnt']==0: continue
+        if S_size==size or L_size==size: continue
+        avg_w = boxgrp['avg_w']
+        if avg_w <= S_w:
+            S_grp.append(size)
+        elif avg_w >= L_w:
+            L_grp.append(size)
+        else:
+            if avg_w/S_w < 1.5:
+                S_grp.append(size)
+            else:
+                L_grp.append(size)
+    
+    # S_grp --> S, L_grp --> L
+    for i, r_line in enumerate(res4api_detect_line):
+        lsize = r_line['size']
+        lsize = 'S' if lsize in S_grp else 'L'
+        r_line['size'] = lsize
 
 def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=False):
     filename, pth_sav_dir = '',''
@@ -359,45 +479,68 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
     }
     cords_db_orig = [v['box'] for index,v in res_detect_line_db.items()]
 
-    # I. 原始坐标
-    cords_orig = cords_craft_orig + cords_db_orig
-    cords_orig_ = [ conv_cords(cord) for cord in cords_orig  ]
+    # I. 
+    cords_craft_orig_ = [ conv_cords(cord) for cord in cords_craft_orig  ]
+    cords_db_orig_ = [ conv_cords(cord) for cord in cords_db_orig  ]
+    cords_orig_ = cords_craft_orig_ + cords_db_orig_
 
     # 过滤 宽w/长h > 1.1的框， RATIO_WH_FILTER 参数配置
     RATIO_WH_FILTER = 1.1  # 过滤 w/h > 1.05 ?  的框
 
     W_AVG = np.mean([cord[-3] for cord in cords_orig_])
     H_AVG = np.mean([cord[-2] for cord in cords_orig_])
-    cords_orig_ = [ cord for cord in cords_orig_ if cord[-1]<=RATIO_WH_FILTER and cord[-2]>W_AVG]
+    # 改变初始过滤策略:过滤交叉>=3的框 -- BEGIN
+    # cords_orig_ = [ cord for cord in cords_orig_ if cord[-1]<=RATIO_WH_FILTER and cord[-2]>W_AVG]
+    cords_orig_ = [ cord for cord in cords_orig_ if cord[-1]<=RATIO_WH_FILTER]
+
+    # if dbg and not pth_img=='':
+    if not pth_img=='':
+         # 画craft框（红色）  END
+        draw_box(cords_craft_orig, pth_img, pth_img_rect )
+        # 在craft画框基础上，再画db框（蓝色）  END
+        draw_box(cords_db_orig, pth_img_rect, pth_img_rect, color=(255,0,0))
+
+    # 改变初始过滤策略:过滤交叉>=3的框 -- BEGIN
+    _Xmin = min([c_d[0] for c_d in cords_orig_])
+    _Ymin = min([c_d[1] for c_d in cords_orig_])
+    _minDot = (_Xmin, _Ymin)  # 最左上的点
+
+    cords_inter2plus = [cord for cord in cords_craft_orig_ if isinter2plus(cord, cords_db_orig_, _minDot) ]
+    for cord in cords_inter2plus:
+        try:
+            cords_orig_.remove(cord)
+        except Exception as e:
+            continue
+    # 改变初始过滤策略:过滤交叉>=3的框 -- END
+
 
     # II. 坐标转换(宽度缩放到0.7)
     cords, cords_craft, cords_db = [], [], []
     # 宽度缩放比例， RESIZE_X 参数配置
-    RESIZE_X = 0.7
+    RESIZE_X, RESIZE_Y = 0.7, 0.9
 
     for cord in cords_orig_:  # x方向坐标压缩（避免横向不同大框之间的框交错）
         _cord = xmin,ymin,xmax,ymax = cord[0], cord[1], cord[2], cord[3]
         if RESIZE_X < 1.0:
             _cord = list(scale_x(_cord, RESIZE_X))
+            _cord = list(scale_y(_cord, RESIZE_Y))
         cords.append(_cord)
 
     for cord_cft in cords_craft_orig:
         _cord_cft = int(cord_cft[0]), int(cord_cft[1]), int(cord_cft[4]), int(cord_cft[5])
         if RESIZE_X < 1.0:
             _cord_cft = list(scale_x(_cord_cft, RESIZE_X))
+            _cord_cft = list(scale_y(_cord_cft, RESIZE_Y))
         cords_craft.append(_cord_cft)
 
     for cord_db in cords_db_orig:
         _cord_db = int(cord_db[0]), int(cord_db[1]), int(cord_db[4]), int(cord_db[5])
         if RESIZE_X < 1.0:
             _cord_db = list(scale_x(_cord_db, RESIZE_X))
+            _cord_db = list(scale_y(_cord_db, RESIZE_Y))
         cords_db.append(_cord_db)
 
-    if dbg and not pth_img=='':
-         # 画craft框（红色）  END
-        draw_box(cords_craft_orig, pth_img, pth_img_rect, resize_x=RESIZE_X )
-        # 在craft画框基础上，再画db框（蓝色）  END
-        draw_box(cords_db_orig, pth_img_rect, pth_img_rect, color=(255,0,0), resize_x=RESIZE_X)
+
 
     # 求全局XMIN, YMIN, XMAX, YMAX
     Xmin = min([c_d[0] for c_d in cords])
@@ -414,6 +557,16 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
     # 过滤掉过短的线段
     lines = [l for l in lines if (LLEN_AVG*RATIO_LINE_FILTER)<(l[2]-l[0])]
     lines.sort(key=lambda pt: pt[2], reverse=True)
+
+    # if dbg and not pth_img=='':
+    if not pth_img=='':
+         # 画craft框（红色）  END
+        _cords_craft = [[c[0],c[1], c[2],c[1], c[2],c[3], c[0],c[3]] for c in cords_craft]
+        _cords_db = [[c[0],c[1], c[2],c[1], c[2],c[3], c[0],c[3]] for c in cords_db ]
+        pth_img_rect_resize = os.path.join(pth_sav_dir,filename+'rec_resize.jpg') if not ''==pth_img else ''
+        draw_box(_cords_craft, pth_img, pth_img_rect_resize )
+        # 在craft画框基础上，再画db框（蓝色）  END
+        draw_box(_cords_db, pth_img_rect_resize, pth_img_rect_resize, color=(255,0,0))
 
     # III. x轴方向线段归并
     lines_union, line_u = [], lines[0]
@@ -447,7 +600,7 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
     # 画大框
     if dbg:
         pth_img_with_bigbox = pth_img_rect.replace('rec.jpg','rec_bigbox.jpg')
-        draw_box(bigboxes, pth_img_rect, pth_img_with_bigbox, color=(0,128,0), thickness=2)
+        draw_box(bigboxes, pth_img_rect_resize, pth_img_with_bigbox, color=(0,128,0), thickness=2)
 
     # V. 过滤属于大框内的subbox
     cords.sort(key=lambda pt:pt[0], reverse=True)
@@ -536,7 +689,7 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
                 # x方向缩放10/7
                 _ubox = scale_x(_ubox, resize_x=(10/6))
                 # y方向缩放10/9
-                # _ubox = scale_y(_ubox, resize_y=(10/9))
+                _ubox = scale_y(_ubox, resize_y=(10/9))
                 bigboxes_subboxes[i]['uboxes_g'][idx_ubox_g] = _ubox
                 idx_ubox_g+=1
 
@@ -563,10 +716,11 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
     if not ''==pth_img:
         pth_img_uboxes_g = pth_img_rect.replace('rec.jpg','rec_uboxes_g.jpg')
         draw_box(uboxes_lurd, pth_img, pth_img_uboxes_g, color=color_ubox, thickness=2, seqnum=True)
-        draw_box(bigboxes, pth_img_uboxes_g, pth_img_uboxes_g, color=(128,0,0), thickness=2, seqnum=True)
+        draw_box(bigboxes, pth_img_uboxes_g, pth_img_uboxes_g, color=(128,0,0), thickness=1, seqnum=True)
 
     # VIII. 求框中位数，计算字体M, S（双行夹批）
 
     return res4api_detect_line_union
-
-
+    
+    # db和craft相交,保留db(例外: craft全包db且远长于db)
+    # 重叠矩形(可能是ubox) 判断逻辑

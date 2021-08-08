@@ -22,6 +22,7 @@ def main():
                         help='The name of dataloader which will be evaluated on.')
     parser.add_argument('--image_short_side', type=int, default=736,
                         help='The threshold to replace it in the representers')
+    parser.add_argument('--result_dir', type=str, default='./demo_results/', help='path to save results')
     parser.add_argument('--thresh', type=float,
                         help='The threshold to replace it in the representers')
     parser.add_argument('--box_thresh', type=float, default=0.6,
@@ -51,20 +52,25 @@ def main():
     experiment = Configurable.construct_class_from_config(experiment_args)
 
     demo_handler = Demo(experiment, experiment_args, cmd=args)
+    error_pic = []
 
-    img_list = []
-    img_ext_set = {'.jpg', '.tif', '.png', '.jpeg', 'tiff'}
-    for root, dirs, files in os.walk(args['image_path']):
-        for file in files:
-            if os.path.splitext(file)[1].lower() not in img_ext_set:
+    if os.path.isdir(args['image_path']):
+        img_cnt = len(os.listdir(args['image_path']))
+        for idx, img in enumerate(os.listdir(args['image_path'])):
+            if os.path.splitext(img)[1].lower() not in ['.jpg', '.tif', '.png', '.jpeg', '.gif']:
                 continue
-            path = os.path.join(root, file)
-            img_list.append(path)
+            t = time.time()
+            try:
+                demo_handler.inference(os.path.join(args['image_path'], img), args['visualize'])
+            except:
+                error_pic.append(img)
 
-    for idx, img in enumerate(img_list):
+            print("{}/{} elapsed time : {:.4f}s".format(idx + 1, img_cnt, time.time() - t))
+    else:
         t = time.time()
-        demo_handler.inference(img, args['visualize'])
-        print("{}/{} elapsed time : {:.4f}s".format(idx + 1, len(img_list) + 1, time.time() - t))
+        demo_handler.inference(args['image_path'], args['visualize'])
+        print("elapsed time : {}s".format(time.time() - t))
+    print(error_pic)
 
 
 class Demo:
@@ -117,9 +123,10 @@ class Demo:
         return resized_img
 
     def load_image(self, image_path):
-        # for chinese character in path case
-        # img = cv2.imdecode(np.fromfile(image_file, dtype=np.uint8), 1).astype('float32')
-        img = cv2.imread(image_path, cv2.IMREAD_COLOR).astype('float32')
+        # 可以处理中文路径
+        img = utils.cv2read(image_path).astype('float32')
+        # img = cv2.imread(image_path, cv2.IMREAD_COLOR).astype('float32')
+        img = utils.cv2read(image_path).astype('float32')
         if img is None:
             return None, None
         original_shape = img.shape[:2]
@@ -131,10 +138,15 @@ class Demo:
 
     def format_output(self, batch, output):
         batch_boxes, batch_scores = output
+        crop_img_path = os.path.join(self.args['result_dir'], 'crop')
+        os.makedirs(crop_img_path, exist_ok=True)
         for index in range(batch['image'].size(0)):
             original_shape = batch['shape'][index]
             filename = batch['filename'][index]
-            result_file_path = os.path.splitext(filename)[0] + '.txt'
+            raw_img = utils.cv2read(filename).astype('float32')
+            # raw_img = cv2.imread(filename, cv2.IMREAD_COLOR)
+            result_file_name = 'res_' + os.path.splitext(os.path.basename(filename))[0] + '.txt'
+            result_file_path = os.path.join(self.args['result_dir'], result_file_name)
             boxes = batch_boxes[index]
             scores = batch_scores[index]
             if self.args['polygon']:
@@ -157,21 +169,49 @@ class Demo:
                     if len(new_boxes) == 0:
                         return
                     recs = [utils.trans_poly_to_rec(idx, box) for idx, box in enumerate(new_boxes)]
-                    cluster_rec_ids = utils.cluster_recs(recs)
+                    cluster_rec_ids = utils.cluster_recs_with_width(
+                        recs,
+                        new_boxes,
+                        type='AgglomerativeClustering_ward',
+                        n_clusters=2
+                    )
+                    cluster_recs = []
+                    for k in cluster_rec_ids.keys():
+                        box_ids = cluster_rec_ids[k]
+                        cluster_recs.append([recs[box_id] for box_id in box_ids])
+                    cluster_recs = sorted(cluster_recs, key=utils.width_sort, reverse=False)
+                    bigger_idx = [b.idx for b in cluster_recs[-1]]
+                    '''
+                    cluster_rec_ids = utils.cluster_recs_with_lr(recs, type='DBSCAN')
                     cluster_recs = []
                     for k in cluster_rec_ids.keys():
                         box_ids = cluster_rec_ids[k]
                         cluster_recs.append([recs[box_id] for box_id in box_ids])
                     classified_recs = sorted(cluster_recs, key=utils.list_sort, reverse=True)
                     classified_recs = [sorted(l, key=utils.box_sort, reverse=False) for l in classified_recs]
-                    output_recs = utils.read_out_2(classified_recs, recs)
+                    output_recs = utils.read_out(classified_recs, recs, cover_threshold=0.3, bigger_idx=bigger_idx)
+                    '''
+                    output_recs = utils.read_out_2(recs, bigger_idx)
                     output_idxs = []
-                    for rec in output_recs:
+                    for crop_idx, rec in enumerate(output_recs):
+                        crop_path = os.path.join(
+                            crop_img_path,
+                            os.path.splitext(os.path.basename(filename))[0] + '_' + str(crop_idx) + '.jpg'
+                        )
+                        crop_l = max(0, rec.l - 5)
+                        crop_r = min(original_shape[1], rec.r + 5)
+                        crop_u = max(0, rec.u - 5)
+                        crop_d = min(original_shape[0], rec.d + 5)
+                        cv2.imwrite(crop_path, raw_img[crop_u:crop_d, crop_l:crop_r, :])
                         output_idxs.append(rec.idx)
                     # output_idxs = [i.idx for i in output_idxs]
-                    with open(result_file_path, 'wt') as res:
+                    with open(result_file_path, 'w', encoding='utf-8') as res:
                         for idx in output_idxs:
                             box = new_boxes[idx].reshape(-1).tolist()
+                            if idx in bigger_idx:
+                                box.append('big')
+                            else:
+                                box.append('small')
                             box = list(map(str, box))
                             result = ",".join(box)
                             res.write(result + "\n")
@@ -184,6 +224,7 @@ class Demo:
                             box = boxes[i, :, :].reshape(-1).tolist()
                             result = ",".join([str(int(x)) for x in box])
                             res.write(result + ',' + str(score) + "\n")
+
 
     def inference(self, image_path, visualize=False):
         # all_metrics = {}
@@ -198,10 +239,15 @@ class Demo:
             batch['image'] = img
             pred = self.model.forward(batch, training=False)
             output = self.structure.representer.represent(batch, pred, is_output_polygon=self.args['polygon'])
+            if not os.path.isdir(self.args['result_dir']):
+                os.mkdir(self.args['result_dir'])
             self.format_output(batch, output)
+
             if visualize and self.structure.visualizer:
                 vis_image = self.structure.visualizer.demo_visualize(image_path, output, self.args['box_thresh'])
-                cv2.imwrite(os.path.splitext(image_path)[0] + '_res.jpg', vis_image)
+                # cv2.imwrite(os.path.splitext(image_path)[0] + '_res.jpg', vis_image)
+                res_path = os.path.join(self.args['result_dir'], os.path.splitext(os.path.basename(image_path))[0] + '.jpg')
+                utils.cv2save(vis_image, res_path)
 
 
 if __name__ == '__main__':
