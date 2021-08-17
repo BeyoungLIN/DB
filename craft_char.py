@@ -3,9 +3,9 @@
 # @Author : beyoung
 # @Email  : linbeyoung@stu.pku.edu.cn
 # @File   : craft_char.py.py
-
-
 import base64
+import collections
+import itertools
 import json
 import math
 import os
@@ -18,6 +18,7 @@ import numpy as np
 import requests
 import six
 from PIL import Image
+from sklearn.cluster import DBSCAN, MeanShift, OPTICS, Birch
 
 from zhtools.langconv import *
 
@@ -119,10 +120,10 @@ def draw_box(cords, pth_img, pth_img_rect, color=(0, 0, 255), resize_x=1.0, thic
 
             draw_1 = cv2.rectangle(img, (x, y), (x_, y_), color, thick)
             if seqnum:
-                draw_1 = cv2.putText(img, str(ibox), (int((x + x_) / 2 - 10), y + 20), font, 0.6, color=color)
+                draw_1 = cv2.putText(img, str(ibox), (int((x + x_) / 2 - 10), y + 20), font, 1, color=color, thickness=2)
             if not '' == text:
                 font = cv2.FONT_HERSHEY_SIMPLEX
-                draw_1 = cv2.putText(img, text, (int((x + x_) / 2 - 10), y + 16), font, 0.4, color=color)
+                draw_1 = cv2.putText(img, text, (int((x + x_) / 2 - 10), y + 16), font, 1, color=color, thickness=2)
 
         # print('Writing to image with rectangle {}\n'.format(pth_img_rect))
         cv_imwrite(pth_img_rect, draw_1)  # 解决中文路径文件的写
@@ -173,24 +174,38 @@ def test_one(pth_img):
     img = readPILImg(pth_img)
 
     # res4api_detect_line = request_api(url_page_recog_0, param_recog, _auth)
-    # res4api_detect_line = request_api(url_page_recog_1, param_recog, _auth)
-    res4api_detect_line = request_api(url_page_recog, param_recog, _auth)
+    res4api_detect_line = request_api(url_page_recog_1, param_recog, _auth)
+    # res4api_detect_line = request_api(url_page_recog, param_recog, _auth)
+    # print(res4api_detect_line)
 
     res_detect_line = {
         int(itm['name']): {'box': [float(pt) for pt in itm['box']], 'text': itm['text']} for itm in res4api_detect_line
     }
+    res_detect_line_list = [
+        {'box': [float(pt) for pt in itm['box']], 'text': itm['text']} for itm in res4api_detect_line
+    ]
     out_sav = ''
     cords = [v['box'] for index, v in res_detect_line.items()]
-    # cords_np = []
+    cords_np = []
     # print(cords)
+
+    sorted_res_detect_line = bubble_sort(res_detect_line_list)
+    # sorted_res_detect_line = res_detect_line_list
+    # print(res_detect_line_list)
+    cords = [cord['box'] for cord in sorted_res_detect_line]
+    pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec_db.jpg')
+    draw_box(cords, pth_img, pth_img_rect, seqnum=True, resize_x=0.8,show_img=True)
+
     # for cord in cords:
     #     cord = np.array(cord)
     #     cord = cord.reshape(-1, 2)
     #     cords_np.append(cord)
     # # cords = adjustColumeBoxes(cords)
+    # # cords = adjustBoxesoutput(cords_np)
     # boxes = []
-    # # print(cords_np)
-    # boxes_np = adjustColumeBoxes(cords_np)
+    # print(cords_np)
+    # boxes_np = cluster_sort(cords_np)
+    #
     # for box in boxes_np:
     #     box = box.reshape(-1, 8)
     #     for box_ in box.tolist():
@@ -198,17 +213,127 @@ def test_one(pth_img):
     #         # for box__ in box_:
     #         boxes.append(box_)
     # print(boxes)
-
-    for i in range(len(cords)):
-
-
-
-    pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg')
-    draw_box(cords, pth_img, pth_img_rect, seqnum=True, resize_x=0.8, show_img=True)
-
+    #
+    #
+    # pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg')
+    # draw_box(boxes, pth_img, pth_img_rect, seqnum=True, resize_x=0.8,show_img=True)
+    res_txt = ''
     # print(res_detect_line.get('text'))
-    for box in res4api_detect_line:
-        print(box.get('text'))
+    for box in sorted_res_detect_line:
+        # print(box.get('text'))
+        res_txt += box['text'] + '\n'
+    # res_txt = [box['text'] + '\n' for box in sorted_res_detect_line]
+    print(res_txt)
+    # with open(os.path.join(pth_sav_dir, filename) + '.txt', 'w') as f:
+        # f.write(res_txt)
+
+
+def bubble_sort(items):
+    for i in range(len(items) - 1):
+        flag = False
+        for j in range(len(items) - 1 - i):
+            if not check_order(items[j], items[j + 1]):
+                # if not check_order(items.get[j], items.get[j + 1]):
+                #     items.get[j], items.get[j + 1] = items.get[j + 1], items.get[j]
+                items[j], items[j + 1] = items[j + 1], items[j]
+                flag = True
+        if not flag:
+            break
+    return items
+
+
+def check_order(dict_1, dict_2):
+    '''
+
+    :param list_1:
+    :param list_2:
+    :return:
+    True means list1 is before list2, False means list2 is before list 1
+    '''
+    if dict_1.get('box')[0] >= dict_2.get('box')[2]:
+        return True
+    elif dict_1.get('box')[1] < dict_2.get('box')[3]:
+        return True
+    else:
+        return False
+
+
+def convert_bbox_to_lrud(bbox):
+    l = min(bbox[:, 0])
+    r = max(bbox[:, 0])
+    u = min(bbox[:, 1])
+    d = max(bbox[:, 1])
+    return l, r, u, d
+
+
+def cluster_boxes(boxes, type='DBSCAN'):
+    switch = {
+        'DBSCAN': DBSCAN(min_samples=1, eps=7),
+        'MeanShift': MeanShift(bandwidth=0.3),
+        'OPTICS': OPTICS(min_samples=1, eps=20),
+        'Birch': Birch(n_clusters=None)
+    }
+    cluster = switch[type]
+    boxes_data = [[b['l'], b['r']] for b in boxes]
+    boxes_data = np.array(boxes_data)
+    labels = cluster.fit_predict(boxes_data)
+    '''
+    plt.scatter(boxes_data[:, 0], boxes_data[:, 1], s=1, c=labels)
+    plt.show()
+    '''
+    classified_box_ids = collections.defaultdict(list)
+    for idx, label in enumerate(labels):
+        classified_box_ids[label].append(idx)
+    return classified_box_ids
+
+
+def list_sort(box_list):
+    r = [b['r'] for b in box_list]
+    length = [b['r'] - b['l'] for b in box_list]
+    r = np.mean(r)
+    length = np.mean(length)
+    return r + length
+
+
+def box_sort(box):
+    u = box['u']
+    d = box['d']
+    return (u + d) / 2
+
+
+def cluster_sort(boxes):
+    """
+    :param boxes:
+    :return: cluster then sorted boxes
+        l = array[0, 0]
+        r = array[1, 0]
+        u = array[0, 1]
+        d = array[2, 1]
+    """
+    boxes_lrud = []
+    for id, box in enumerate(boxes):
+        l, r, u, d = convert_bbox_to_lrud(box)
+        boxes_lrud.append({'id': id, 'l': l, 'r': r, 'u': u, 'd': d})
+    # boxes_lrud = [{'l': b[0, 0], 'r': b[1, 0], 'u': b[0, 1], 'd': b[2, 1], 'id': id} for id, b in enumerate(boxes)]
+    '''
+    classified_box_ids = projection_split(shape, boxes_lrud)
+    classified_boxes = []
+    for k in classified_box_ids.keys():
+        box_ids = classified_box_ids[k]
+        classified_boxes.append([boxes_lrud[box_id] for box_id in box_ids])
+    '''
+    classified_box_ids = cluster_boxes(boxes_lrud)
+    classified_boxes = []
+    for k in classified_box_ids.keys():
+        box_ids = classified_box_ids[k]
+        classified_boxes.append([boxes_lrud[box_id] for box_id in box_ids])
+    classified_boxes = sorted(classified_boxes, key=list_sort, reverse=True)
+    new_classifier_boxes = []
+    for box_list in classified_boxes:
+        new_classifier_boxes.append(sorted(box_list, key=box_sort, reverse=False))
+    new_classifier_boxes = list(itertools.chain.from_iterable(new_classifier_boxes))
+    new_classifier_boxes = [boxes[b['id']] for b in new_classifier_boxes]
+    return new_classifier_boxes
 
 
 # faster-rcnn char detect
@@ -250,175 +375,8 @@ def test_char_detect_1(pth_img):
     pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg')
     draw_box(cords, pth_img, pth_img_rect, show_img=True)
 
-def adjustBoxesoutput(boxes):
-    new_boxes = []
-    vis = [False for _ in range(len(boxes))]
-    for i in range(len(boxes)):
-        if vis[i]:
-            continue
-        cur_box = boxes[i]
-        flag = True
-        while flag:
-            flag = False
-            for j in range(i + 1, len(boxes)):
-                if vis[j]:
-                    continue
-                if cal_IoU(cur_box, boxes[j]) > row_threshold and check_vertical_dis(cur_box, boxes[j]):
-                    vis[j] = True
-                    cur_box = mergeArray(cur_box, boxes[j])
-                    flag = True
-        vis[i] = True
-        new_boxes.append(cur_box)
-
-def adjustColumeBoxes(boxes: List, row_threshold=0.67, col_threshold=1.35, union_threshold=0.8):
-    def cal_IoU(array1, array2):
-        array1_l = array1[0, 0]
-        array1_r = array1[1, 0]
-        array2_l = array2[0, 0]
-        array2_r = array2[1, 0]
-        in_l = max(array1_r, array2_r) - min(array1_l, array2_l)
-        # in_l = max(0, in_l)
-        un_l = min(array1_r, array2_r) - max(array1_l, array2_l)
-        un_l = max(0, un_l)
-        return un_l / in_l
-
-    def check_vertical_dis(array1, array2):
-        array1_u = array1[0, 1]
-        array1_d = array1[2, 1]
-        array2_u = array2[0, 1]
-        array2_d = array2[2, 1]
-        dis = max(array1_u, array2_u) - min(array1_d, array2_d)
-        array2_ver = array2_d - array2_u
-        if dis < array2_ver * col_threshold:
-            return True
-        else:
-            return False
-
-    def mergeArray(array1, array2):
-        array1_l = array1[0, 0]
-        array1_r = array1[1, 0]
-        array1_u = array1[0, 1]
-        array1_d = array1[2, 1]
-        array2_l = array2[0, 0]
-        array2_r = array2[1, 0]
-        array2_u = array2[0, 1]
-        array2_d = array2[2, 1]
-        array1_area = (array1_r - array1_l) * (array1_d - array1_u)
-        array2_area = (array2_r - array2_l) * (array2_d - array2_u)
-        new_array_l = (array1_l * array1_area + array2_l * array2_area) / (array1_area + array2_area)
-        new_array_r = (array1_r * array1_area + array2_r * array2_area) / (array1_area + array2_area)
-        new_array_u = min(array1_u, array2_u)
-        new_array_d = max(array1_d, array2_d)
-        new_array = [[new_array_l, new_array_u], [new_array_r, new_array_u],
-                     [new_array_r, new_array_d], [new_array_l, new_array_d]]
-        new_array = np.array(new_array, dtype=np.float)
-        return new_array
-
-    def getArea(array1):
-        array1_l = array1[0, 0]
-        array1_r = array1[1, 0]
-        array1_u = array1[0, 1]
-        array1_d = array1[2, 1]
-        array1_area = (array1_r - array1_l) * (array1_d - array1_u)
-        return array1_area
-
-    def checkArrayUnion(array1, array2):
-        array1_l = array1[0, 0]
-        array1_r = array1[1, 0]
-        array1_u = array1[0, 1]
-        array1_d = array1[2, 1]
-        array2_l = array2[0, 0]
-        array2_r = array2[1, 0]
-        array2_u = array2[0, 1]
-        array2_d = array2[2, 1]
-        arrayU_l = max(array1_l, array2_l)
-        arrayU_r = min(array1_r, array2_r)
-        arrayU_u = max(array1_u, array2_u)
-        arrayU_d = min(array1_d, array2_d)
-        if arrayU_r > arrayU_l and arrayU_d > arrayU_u:
-            arrayU_area = (arrayU_r - arrayU_l) * (arrayU_d - arrayU_u)
-            array1_area = (array1_r - array1_l) * (array1_d - array1_u)
-            array2_area = (array2_r - array2_l) * (array2_d - array2_u)
-            if arrayU_area > array1_area * union_threshold or arrayU_area > array2_area * union_threshold:
-                return True
-            else:
-                return False
-        else:
-            return False
-
-    def getArrayUnion(array1, array2):
-        array1_l = array1[0, 0]
-        array1_r = array1[1, 0]
-        array1_u = array1[0, 1]
-        array1_d = array1[2, 1]
-        array2_l = array2[0, 0]
-        array2_r = array2[1, 0]
-        array2_u = array2[0, 1]
-        array2_d = array2[2, 1]
-        arrayU_l = max(array1_l, array2_l)
-        arrayU_r = min(array1_r, array2_r)
-        arrayU_u = max(array1_u, array2_u)
-        arrayU_d = min(array1_d, array2_d)
-        if arrayU_r > arrayU_l and arrayU_d > arrayU_u:
-            arrayU_area = (arrayU_r - arrayU_l) * (arrayU_d - arrayU_u)
-            return arrayU_area
-        else:
-            return 0
-
-    # 上下合并box
-    new_boxes = []
-    vis = [False for _ in range(len(boxes))]
-    for i in range(len(boxes)):
-        if vis[i]:
-            continue
-        cur_box = boxes[i]
-        flag = True
-        while flag:
-            flag = False
-            for j in range(i + 1, len(boxes)):
-                if vis[j]:
-                    continue
-                if cal_IoU(cur_box, boxes[j]) > row_threshold and check_vertical_dis(cur_box, boxes[j]):
-                    vis[j] = True
-                    cur_box = mergeArray(cur_box, boxes[j])
-                    flag = True
-        vis[i] = True
-        new_boxes.append(cur_box)
-    # 合并交集比例过大的box
-    merge_boxes = []
-    vis = [False for _ in range(len(new_boxes))]
-    for i in range(len(new_boxes)):
-        if vis[i]:
-            continue
-        cur_box = new_boxes[i]
-        flag = True
-        while flag:
-            flag = False
-            for j in range(i + 1, len(new_boxes)):
-                if vis[j]:
-                    continue
-                if checkArrayUnion(cur_box, new_boxes[j]):
-                    vis[j] = True
-                    cur_box = mergeArray(cur_box, new_boxes[j])
-                    flag = True
-        vis[i] = True
-        merge_boxes.append(cur_box)
-    # 和其他所有box有交集且比例过大的删除
-    final_boxes = []
-    cover_area = [0 for _ in range(len(merge_boxes))]
-    for i in range(len(merge_boxes)):
-        for j in range(i + 1, len(merge_boxes)):
-            if i == j:
-                continue
-            union_area = getArrayUnion(merge_boxes[i], merge_boxes[j])
-            cover_area[i] += union_area
-            cover_area[j] += union_area
-    for i in range(len(merge_boxes)):
-        if cover_area[i] <= getArea(merge_boxes[i]) * union_threshold:
-            final_boxes.append(merge_boxes[i])
-    return final_boxes
-
 
 # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000011.jpg')
-test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
+# test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
+test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg')
 # test_char_detect_1('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
