@@ -25,9 +25,9 @@ from zhtools.langconv import *
 url_line_detect = 'http://api.chinesenlp.com:7001/ocr/v1/line_detect'
 url_line_recog = 'http://api.chinesenlp.com:7001/ocr/v1/line_recog'
 
-url_page_recog_0 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_0'
-url_page_recog = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog'
-url_page_recog_1 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_1'
+url_page_recog_0 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_0'  # craft_char
+url_page_recog = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog'  # craft行
+url_page_recog_1 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_1'  # db
 
 
 def cv_imread(file_path=""):
@@ -174,65 +174,87 @@ def test_one(pth_img):
     img = readPILImg(pth_img)
 
     # res4api_detect_line = request_api(url_page_recog_0, param_recog, _auth)
-    res4api_detect_line = request_api(url_page_recog_1, param_recog, _auth)
-    # res4api_detect_line = request_api(url_page_recog, param_recog, _auth)
+    # res4api_detect_line = request_api(url_page_recog_1, param_recog, _auth)
+    res4api_detect_line = request_api(url_page_recog, param_recog, _auth)
     # print(res4api_detect_line)
 
-    res_detect_line = {
-        int(itm['name']): {'box': [float(pt) for pt in itm['box']], 'text': itm['text']} for itm in res4api_detect_line
-    }
+    # res_detect_line = {
+    #     int(itm['name']): {'box': [float(pt) for pt in itm['box']], 'text': itm['text']} for itm in res4api_detect_line
+    # }
+    '''
+    {0: {'box': [1047.0, 32.0, 1123.0, 32.0, 1123.0, 1696.0, 1047.0, 1696.0], 'text': '濟之闢釋氏長孫之表五經唐名流如太白柳州宋'}}
+    '''
+
     res_detect_line_list = [
-        {'box': [float(pt) for pt in itm['box']], 'text': itm['text']} for itm in res4api_detect_line
+        {'box': [float(pt) for pt in itm['box']], 'text': itm['text'], 'size': itm['size']} for itm in res4api_detect_line
     ]
+    '''
+    <class 'list'>: [{'box': [1047.0, 32.0, 1123.0, 32.0, 1123.0, 1696.0, 1047.0, 1696.0], 'text': '濟之闢釋氏長孫之表五經唐名流如太白柳州宋'}]
+    '''
+
     out_sav = ''
-    cords = [v['box'] for index, v in res_detect_line.items()]
+    # cords = [v['box'] for index, v in res_detect_line.items()]
     cords_np = []
     # print(cords)
 
-    sorted_res_detect_line = bubble_sort(res_detect_line_list)
-    # sorted_res_detect_line = res_detect_line_list
+    # sorted_res_detect_line = bubble_sort(res_detect_line_list)
+    sorted_res_detect_line = res_detect_line_list
     # print(res_detect_line_list)
     cords = [cord['box'] for cord in sorted_res_detect_line]
-    pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec_db.jpg')
-    draw_box(cords, pth_img, pth_img_rect, seqnum=True, resize_x=0.8,show_img=True)
+    # pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec_craft.jpg')
+    # draw_box(cords, pth_img, pth_img_rect, seqnum=True, resize_x=0.8)
+    # draw_box(cords, pth_img, pth_img_rect, seqnum=True, resize_x=0.8, show_img=True)
+    '''
 
-    # for cord in cords:
-    #     cord = np.array(cord)
-    #     cord = cord.reshape(-1, 2)
-    #     cords_np.append(cord)
-    # # cords = adjustColumeBoxes(cords)
-    # # cords = adjustBoxesoutput(cords_np)
-    # boxes = []
+    for cord in cords:
+        cord = np.array(cord)
+        cord = cord.reshape(-1, 2)
+        cords_np.append(cord)
+    # cords = adjustColumeBoxes(cords)
+    # cords = adjustBoxesoutput(cords_np)
+    boxes = []
     # print(cords_np)
-    # boxes_np = cluster_sort(cords_np)
-    #
-    # for box in boxes_np:
-    #     box = box.reshape(-1, 8)
-    #     for box_ in box.tolist():
-    #         print(box_)
-    #         # for box__ in box_:
-    #         boxes.append(box_)
+    boxes_np = cluster_sort(cords_np)
+    # boxes_np = cords_np
+
+    for box in boxes_np:
+        box = box.reshape(-1, 8)
+        for box_ in box.tolist():
+            # print(box_)
+            # for box__ in box_:
+            boxes.append(box_)
     # print(boxes)
-    #
-    #
-    # pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg')
-    # draw_box(boxes, pth_img, pth_img_rect, seqnum=True, resize_x=0.8,show_img=True)
+    '''
+
+    # print(boxes)
+    cord_str = ''
+    for cord_box in cords:
+        cord_str += str(cord_box) + '\n'
+    with open(os.path.join(pth_sav_dir, filename) + '_cords.txt', 'w') as f:
+        f.write(str(cord_str))
+    pth_img_rect = os.path.join(pth_sav_dir, filename + '_rec.jpg')
+    # draw_box(boxes, pth_img, pth_img_rect, seqnum=True, resize_x=0.8)
+    draw_box(cords, pth_img, pth_img_rect, seqnum=True, resize_x=0.8)
     res_txt = ''
+    res_txt_size = ''
     # print(res_detect_line.get('text'))
-    for box in sorted_res_detect_line:
-        # print(box.get('text'))
-        res_txt += box['text'] + '\n'
+    for line in sorted_res_detect_line:
+    #     print(line['text'])
+        res_txt += line['text'] + '\n'
+        res_txt_size += '<' + line['size'] + '>' + line['text'] + '</' + line['size'] + '>' + '\n'
     # res_txt = [box['text'] + '\n' for box in sorted_res_detect_line]
-    print(res_txt)
-    # with open(os.path.join(pth_sav_dir, filename) + '.txt', 'w') as f:
-        # f.write(res_txt)
+    # print(res_txt)
+    with open(os.path.join(pth_sav_dir, filename) + '.txt', 'w') as f:
+        f.write(str(res_txt))
+    with open(os.path.join(pth_sav_dir, filename) + '_size.txt', 'w') as f:
+        f.write(str(res_txt_size))
 
 
 def bubble_sort(items):
     for i in range(len(items) - 1):
         flag = False
         for j in range(len(items) - 1 - i):
-            if not check_order(items[j], items[j + 1]):
+            if check_order(items[j], items[j + 1]):
                 # if not check_order(items.get[j], items.get[j + 1]):
                 #     items.get[j], items.get[j + 1] = items.get[j + 1], items.get[j]
                 items[j], items[j + 1] = items[j + 1], items[j]
@@ -251,11 +273,11 @@ def check_order(dict_1, dict_2):
     True means list1 is before list2, False means list2 is before list 1
     '''
     if dict_1.get('box')[0] >= dict_2.get('box')[2]:
-        return True
-    elif dict_1.get('box')[1] < dict_2.get('box')[3]:
-        return True
-    else:
         return False
+    elif (dict_1.get('box')[2] >= dict_2.get('box')[0]) and (dict_1.get('box')[1] < dict_2.get('box')[3]):
+        return False
+    else:
+        return True
 
 
 def convert_bbox_to_lrud(bbox):
@@ -375,8 +397,11 @@ def test_char_detect_1(pth_img):
     pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg')
     draw_box(cords, pth_img, pth_img_rect, show_img=True)
 
+if __name__ == '__main__':
 
-# test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000011.jpg')
-# test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
-test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg')
-# test_char_detect_1('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000011.jpg')
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
+    pth = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000018.jpg'
+    test_one(pth)
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/ER007_pure/20_19584_jpg/000024.jpg')
+    # test_char_detect_1('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')

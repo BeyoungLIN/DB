@@ -5,7 +5,6 @@ import os
 import random
 import time
 import traceback
-from pprint import pprint
 
 import base64
 import cv2
@@ -120,11 +119,13 @@ def cv_imwrite(file_path, frame):
     cv2.imencode('.jpg', frame)[1].tofile(file_path)
 
 
-def draw_box(cords, pth_img, pth_img_rect, color=(0, 0, 255), resize_x=1.0, thickness=1, text='', seqnum=False):
+def draw_box(cords, pth_img, pth_img_rect, color=(0, 0, 255), resize_x=1.0, thickness=1, text='', seqnum=False,
+             hidebox=False):
     try:
         # img = cv2.imread(pth_img)
         img = cv_imread(pth_img)  # 解决中文路径文件的读
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        draw_1 = img
 
         boxes = []
 
@@ -139,7 +140,9 @@ def draw_box(cords, pth_img, pth_img_rect, color=(0, 0, 255), resize_x=1.0, thic
         for ibox, box in enumerate(boxes):
             x, y, x_, y_ = box
             # draw_1 = cv2.rectangle(img, (x,y), (x_,y_), (0,0,255), 2 )
-            draw_1 = cv2.rectangle(img, (x, y), (x_, y_), color, thickness)
+            thick = thickness if not hidebox else 0
+
+            draw_1 = cv2.rectangle(img, (x, y), (x_, y_), color, thick)
             if seqnum:
                 draw_1 = cv2.putText(img, str(ibox), (int((x + x_) / 2 - 10), y + 20), font, 0.6, color=color)
             if not '' == text:
@@ -235,9 +238,9 @@ def test_improc_api_bydir(pth_dir):
 url_line_detect = 'http://api.chinesenlp.com:7001/ocr/v1/line_detect'
 url_line_recog = 'http://api.chinesenlp.com:7001/ocr/v1/line_recog'
 
-url_page_recog_0 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_0'
-url_page_recog = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog'
-url_page_recog_1 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_1'
+url_page_recog_0 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_0'  # craft_char
+url_page_recog = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog'  # craft行
+url_page_recog_1 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_1'  # db
 
 
 # url_line_detect = 'http://192.168.10.47:1688/ocr/v1/line_detect'
@@ -265,9 +268,9 @@ def test_one(pth_img):
 
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
-    if os.path.exists(pth_sav):
-        print('{} already exists'.format(pth_sav))
-        return
+    # if os.path.exists(pth_sav):
+    #     print('{} already exists'.format(pth_sav))
+    #     return
 
     imgbase64 = base64of_img(pth_img)
 
@@ -290,11 +293,11 @@ def test_one(pth_img):
     '''
     # craft检测与识别
     res4api_detect_line = request_api(url_page_recog, param_recog, _auth)
-    # print(res4api_detect_line)
     # db检测与识别
     res4api_detect_line_db = request_api(url_page_recog_1, param_recog, _auth)
+    # print(res4api_detect_line_db)
 
-    # 画db框（红色）  BEGIN  check:这里红色框应该是craft
+    # 画craft框（红色）  BEGIN
     res_detect_line = {
         int(itm['name']): {'box': [float(pt) for pt in itm['box']], 'text': itm['text']} for itm in res4api_detect_line
     }
@@ -308,7 +311,7 @@ def test_one(pth_img):
     # 在craft画框基础上，再画db框（蓝色）  BEGIN
     res_detect_line_db = {
         int(itm['name']): {'box': [float(pt) for pt in itm['box']], 'text': itm['text']} for itm in
-    res4api_detect_line_db
+        res4api_detect_line_db
     }
     cords_db = [v['box'] for index, v in res_detect_line_db.items()]
     draw_box(cords_db, pth_img_rect, pth_img_rect, color=(255, 0, 0), resize_x=0.8)
@@ -328,30 +331,26 @@ def test_one(pth_img):
     ''' '''
     # pack results of  ocr_line
     for index, v in res_detect_line.items():
-        # print(v)
         try:
             img_line = crop_img(img, v['box'])
-            # print()
             pth_img_sav = save_folder + "/col_{}.jpg".format(index)
             # 保存截取的图片
             partImg_array = np.uint8(img_line)
             partImg = Image.fromarray(partImg_array).convert("RGB")
             partImg.save(pth_img_sav)
 
-            pth_col = pth_img_sav
-            picstr = base64of_img(pth_col)
-            param_recog = {
-                'picstr': picstr
-            }
-            # _auth = ('jihe.com', 'DIY#2020')
-            r = requests.post(url_line_recog, data=param_recog, auth=('jihe.com', 'DIY#2020'))
-            print(r)
-            str_res = r.text
-            o_res = json.loads(str_res)
-            res_ocr_line = o_res['data']
+            # pth_col = pth_img_sav
+            # picstr= base64of_img(pth_col)
+            # param_recog = {
+            #     'picstr': picstr
+            # }
+            # r = requests.post(url_line_recog, data=param_recog)
+            # str_res = r.text
+            # o_res = json.loads(str_res)
+            # res_ocr_line = o_res['data']
 
-            pprint(res_ocr_line)
-            res_line = res_ocr_line['best']['text']
+            # pprint(res_ocr_line)
+            # res_line = res_ocr_line['best']['text']
 
             res_line = v['text']
             out_sav += (res_line + '\n')
@@ -359,7 +358,6 @@ def test_one(pth_img):
 
             with open(pth_recog_sav, 'w+', encoding='utf-8') as f:
                 f.write(res_line)
-                # print(res_line)
         except Exception as e:
             print(e)
             continue
@@ -370,6 +368,102 @@ def test_one(pth_img):
     out_sav_sim = '\n'.join([cht_to_chs(ln) for ln in out_sav.split('\n')])
     with open(pth_sav_simplified, 'w+', encoding='utf-8') as f:
         f.write(out_sav_sim.strip())
+
+
+def test_one_adv(pth_img, mod='mix'):  # 专门用于检测大小行,夹批
+    img = readPILImg(pth_img)
+
+    filename, file_ext = os.path.splitext(os.path.basename(pth_img))
+    pth_dir = os.path.abspath(os.path.dirname(pth_img))
+    pth_sav_dir = os.path.join(pth_dir, 'output')
+
+    if not os.path.exists(pth_sav_dir):
+        os.makedirs(pth_sav_dir)
+
+    pth_sav = os.path.join(pth_sav_dir, filename + '_res_recog_adv.txt')
+    save_folder = os.path.join(pth_sav_dir, filename)
+
+    if not os.path.exists(save_folder):
+        os.makedirs(save_folder)
+    # if os.path.exists(pth_sav):
+    #     print('{} already exists'.format(pth_sav))
+    #     return
+
+    imgbase64 = base64of_img(pth_img)
+
+    _auth = ('jihe.com', 'DIY#2020')
+    param_recog = {
+        'picstr': imgbase64,
+        'mod': mod
+        # 'mod': 'adv'
+    }
+
+    if 'mix' == mod:
+        # 检测与识别
+        res4api_detect_line = request_api(url_page_recog, param_recog, _auth)
+
+        # 画框（红色）  BEGIN
+        res_detect_line = {
+            int(itm['name']):
+                {
+                    'box': [float(pt) for pt in itm['box']],
+                    'text': itm['text'],
+                    'size': itm['size']
+                } for itm in res4api_detect_line
+        }
+        out_sav = ''
+        cords = [v['box'] for index, v in res_detect_line.items()]
+
+        pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec_mix.jpg')
+        # pth_img_rect = os.path.join(pth_sav_dir,filename+'rec_adv.jpg')
+        draw_box(cords, pth_img, pth_img_rect, resize_x=0.8, seqnum=True)
+
+        # 存结果json
+        pth_json_res = os.path.join(pth_sav_dir, filename + '_resapi_mix.json.txt')
+        with open(pth_json_res, 'w+', encoding='utf-8') as f:
+            f.write(json.dumps(res4api_detect_line, indent=2, ensure_ascii=False))
+
+        # pack results of  ocr_line
+        for index, v in res_detect_line.items():
+            try:
+
+                res_line, size = v['text'], v['size']
+                out_sav += ('{}\t[{}]\n'.format(res_line, size))
+
+            except Exception as e:
+                print(e)
+                continue
+        with open(pth_sav, 'w+', encoding='utf-8') as f:
+            f.write(out_sav.strip())
+            # print(out_sav.strip())
+    elif 'adv' == mod:
+        res4api_adv = request_api(url_page_recog, param_recog, _auth)
+        pth_json_res_adv = os.path.join(pth_sav_dir, filename + '_resapi_adv.json.txt')
+        with open(pth_json_res_adv, 'w+', encoding='utf-8') as f:
+            f.write(json.dumps(res4api_adv, indent=4, ensure_ascii=False))
+
+        # res4api_detect_line = res4api_adv['res_basic']
+        '''
+        res_char_boxes_list = []
+        # cords = [cord['box'] for cord in sorted_res_detect_line]
+        for res_char_boxes in res4api_detect_line:
+            # res_char_boxes = [res['boxes_char'] for res in res4api_detect_line]
+            # res_char_box = [res_char_box['box'] for res_char_box in res_char_boxes['boxes_char']]
+            for res_char_box in res_char_boxes['boxes_char']:
+                # for res_char_box_ in res_char_box:
+                res_char_boxes_list.append(res_char_box['box'])
+        res_char_boxes_list= [['63', '1623', '165', '1623', '165', '1702', '63', '1702']]
+        pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec_adv_char.jpg')
+        draw_box(res_char_boxes_list, pth_img, pth_img_rect, seqnum=True, resize_x=0.8)
+        '''
+        big_subs = res4api_adv['big_sub_boxes']
+        txt_arr = []
+        # print(big_subs)
+        for i in range(len(big_subs)):
+            big_text = big_subs[str(i)]['text']
+            txt_arr.append(big_text)
+        with open(pth_sav, 'w+', encoding='utf-8') as f:
+            f.write('\n'.join(txt_arr))
 
 
 def test_by_dir(pth_dir):
@@ -459,7 +553,7 @@ def randcolors(n=10):
     return random.sample(_colors, n)
 
 
-from postdetect import concat_boxes
+from postdetect import concat_boxes, get_w_rngs, get_line_size, re_mapping_lsize
 
 
 def ajust_boxes(pth_img, dbg=False):
@@ -476,22 +570,80 @@ def ajust_boxes(pth_img, dbg=False):
     with open(pth_json_res, 'r', encoding='utf-8') as f:
         c = f.read()
         res4api_detect_line = json.loads(c)
-        print(res4api_detect_line)
     ''' '''
     # db检测与识别结果json
     pth_json_res_db = os.path.join(pth_sav_dir, filename + '_db.json.txt')
     with open(pth_json_res_db, 'r', encoding='utf-8') as f:
         c1 = f.read()
         res4api_detect_line_db = json.loads(c1)
-        # print(res4api_detect_line_db)
 
-    # concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img=pth_img, dbg=dbg)
-    res_mix = concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img=pth_img, dbg=dbg)
-    print(res_mix)
-    # 此时, res_mix = res4api_detect_line_union
-    return res_mix
+    concat_res = concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img=pth_img, dbg=dbg)
 
     # uboxes_g 切图后整体识别，重组结构（ubox_g， bigbox的识别文本存储）
+    uboxes_g = concat_res['uboxes_g']
+    bigboxes_uboxes = concat_res['bigboxes_uboxes']
+    res_detect_line = {i: [ub[0], ub[1], ub[2], ub[1], ub[2], ub[3], ub[0], ub[3]] \
+                       for i, ub in enumerate(uboxes_g)}
+    # 返回API
+    res4api_detect_line = [
+        {
+            'box': [str(pt) for pt in box],
+            'name': str(i),
+            'text': ''
+        } for i, box in res_detect_line.items()
+    ]
+    widths_line = []
+    for index, cord in res_detect_line.items():
+        try:
+            x1, y1, x2, y2, x3, y3, x4, y4 = cord
+            min_x, max_x = round((x1 + x4) / 2), round((x2 + x3) / 2)
+            widths_line.append(abs(max_x - min_x))
+        except Exception as e:
+            print(e)
+            continue
+    w_sorted = sorted(widths_line)
+    width_rngs = get_w_rngs(widths_line)
+    print(w_sorted)
+    print(width_rngs)
+
+    sizes = ['S', 'M', 'L', 'XL', 'XXL', 'XXXL']
+    boxgrp_size = {s: [] for s in sizes}
+    for i, r_line in enumerate(res4api_detect_line):
+        box_line = r_line['box']
+        x1, y1, x2, y2, x3, y3, x4, y4 = [int(cord) for cord in box_line]
+        min_x, max_x = round((x1 + x4) / 2), round((x2 + x3) / 2)
+        min_y, max_y = round((y1 + y2) / 2), round((y3 + y4) / 2)
+        width_line = abs(max_x - min_x)
+
+        line_size = get_line_size(width_rngs, width_line)
+        r_line['size'] = line_size
+
+        boxgrp_size[line_size].append(box_line)
+        print('{} - witdth:\t{}\tsize:{}'.format(i, width_line, r_line['size']))
+
+    # line size remapping
+    re_mapping_lsize(res4api_detect_line)
+    sizes = ['S', 'M']
+    boxgrp_size = {s: [] for s in sizes}
+    for i, r_line in enumerate(res4api_detect_line):
+        box_line = r_line['box']
+        line_size = r_line['size']
+
+        boxgrp_size[line_size].append(box_line)
+
+    uboxes_lurd = [[
+        ub[0], ub[1], ub[2], ub[1], ub[2], ub[3], ub[0], ub[3]
+    ] for ub in uboxes_g]
+    bigboxes = [bigitem['cords_big'] for i, bigitem in bigboxes_uboxes.items()]
+    pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg') if not '' == pth_img else ''
+    pth_img_with_size = pth_img_rect.replace('rec.jpg', 'rec_uboxes_size.jpg')
+    draw_box(uboxes_lurd, pth_img, pth_img_with_size, color=(0, 128, 0), thickness=2, seqnum=True)
+    draw_box(bigboxes, pth_img_with_size, pth_img_with_size, color=(128, 0, 0), thickness=1, seqnum=True)
+    # 输出带size的图
+    for size, boxgrp in boxgrp_size.items():
+        if len(boxgrp) == 0: continue
+        draw_box(boxgrp, pth_img_with_size, pth_img_with_size, color=(0, 128, 0), thickness=1, text=str(size),
+                 hidebox=True)
 
 
 def main():
@@ -508,72 +660,52 @@ def main():
     # test_char_detect_1(pth_line)
 
 
-def main1(pth_img):
-    # pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\image_002_看图王.jpg'
+def main1():
+    pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\image_002_看图王.jpg'
     # 用新db测试一遍 史记9
-    # pth_img = r'/Users/Beyoung/Desktop/Projects/DB/datasets/new_test/图片 1.png'
+    pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\史记2.jpg'
+    # pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\139d33ed172842bdcf5fbe00c8c278f.jpg'
     # pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\ZHSY003341-000009.tif'
-    # pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\绝妙好词笺.七卷.宋.周密原辑.清.查为仁.厉鹗同笺.清乾隆十五年宛平查氏澹宜书屋刊本 (1) - 0006(1).tif'
-    ajust_boxes(pth_img, dbg=True)
+    pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\绝妙好词笺.七卷.宋.周密原辑.清.查为仁.厉鹗同笺.清乾隆十五年宛平查氏澹宜书屋刊本 (1) - 0006(1).tif'
+    # pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\集韵_抽样\页面提取自－集韵（述古堂影宋钞本_ 上海古籍）上_页面_058.jpg'
+    pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\集韵_抽样\页面提取自－集韵（述古堂影宋钞本_ 上海古籍）上_页面_071.jpg'
+    pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\史记10.jpg'
+    # ajust_boxes(pth_img, dbg=False)
+    pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\页面提取自－集韵（述古堂影宋钞本_ 上海古籍）上_页面_157.jpg'
+    pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\页面提取自－集韵（述古堂影宋钞本_ 上海古籍）上_页面_088.jpg'
+    pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\ZHSY003355-000018.tif'
+    pth_img = r'E:\Projs\AncientBooks\src\test\api_set\page\0\bug_ZHSY003355-000019.tif'
+    pth_img = '/Users/Beyoung/Desktop/Projects/AC_OCR/temp/test/001029.jpg'
+    pth_img = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg'
+    pth_img = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg'
+    ajust_boxes(pth_img, dbg=False)
+
+
+def main2():
+    pth_dir = r'E:\Projs\AncientBooks\src\test\api_set\page\集韵_抽样'
+    pth_dir = r'E:\Projs\AncientBooks\src\test\api_set\page\版刻图像'
+    lst = os.listdir(pth_dir)
+    lst = [f for f in lst if f.endswith('.jpg')]
+    for f in tqdm(lst):
+        pth_f = os.path.join(pth_dir, f)
+        ajust_boxes(pth_f)
+
+
+def main3():
+    pth = r'E:\Projs\AncientBooks\src\test\api_set\page\0\页面提取自－集韵（述古堂影宋钞本_ 上海古籍）上_页面_071.jpg'
+    # pth= '绝妙好词笺.七卷.宋.周密原辑.清.查为仁.厉鹗同笺.清乾隆十五年宛平查氏澹宜书屋刊本 (1) - 0006(1).tif'
+    pth = r'E:\Projs\AncientBooks\src\test\api_set\page\0\bug_ZHSY003355-000019.tif'
+    pth = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg'
+    pth = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg'
+    pth = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg'
+    pth = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000001.jpg'
+    # test_one_adv(pth)
+    test_one_adv(pth, mod='adv')
 
 
 if __name__ == "__main__":
     # main()
     # test_improc_api('','')
-    # main1(r'/Users/Beyoung/Desktop/Projects/AC_OCR/金陵诗徵/24561622248357_.pic_hd.jpg')
-    pth_img = '/Users/Beyoung/Desktop/Projects/AC_OCR/OCR测试图像2/史记1.jpg'
-    res4api_detect_line_union = ajust_boxes(pth_img, dbg=False)
-    # print(res4api_detect_line_union)
-    # res_detect_line_union = {
-    #     int(itm['name']): {'box': [float(pt) for pt in itm['box']], 'text': itm['text']} for itm in res4api_detect_line_union
-    # }
-    # # cords_db = [v['box'] for index, v in res_detect_line_union.items()]
-    # # print(ajust_boxes('/Users/Beyoung/Desktop/Projects/AC_OCR/OCR测试图像2/史记1.jpg', dbg=False))
-    # # pack results of  ocr_line
-    #
-    # img = readPILImg
-    #
-    # filename, file_ext = os.path.splitext(os.path.basename(pth_img))
-    # pth_dir = os.path.abspath( os.path.dirname(pth_img) )
-    # pth_sav_dir = os.path.join(pth_dir,'output' )
-    #
-    # if not os.path.exists(pth_sav_dir):
-    #     os.makedirs(pth_sav_dir)
-    #
-    # pth_sav = os.path.join(pth_sav_dir,filename+'_res_recog.txt')
-    # save_folder = os.path.join(pth_sav_dir,filename)
-    #
-    # for index, v in res_detect_line_union.items():
-    #     try:
-    #         img_line = crop_img(img, v['box'])
-    #         pth_img_sav = save_folder + "/col_{}.jpg".format(index)
-    #         # 保存截取的图片
-    #         partImg_array = np.uint8(img_line)
-    #         partImg = Image.fromarray(partImg_array).convert("RGB")
-    #         partImg.save(pth_img_sav)
-    #
-    #         pth_col = pth_img_sav
-    #         picstr= base64of_img(pth_col)
-    #         param_recog = {
-    #             'picstr': picstr
-    #         }
-    #         r = requests.post(url_line_recog, data=param_recog)
-    #         print(r)
-    #         str_res = r.text
-    #         o_res = json.loads(str_res)
-    #         res_ocr_line = o_res['data']
-    #
-    #         pprint(res_ocr_line)
-    #         res_line = res_ocr_line['best']['text']
-    #
-    #         res_line = v['text']
-    #         out_sav += (res_line + '\n')
-    #         pth_recog_sav = save_folder + "/col_{}_recog.txt".format(index)
-    #
-    #         with open(pth_recog_sav, 'w+', encoding='utf-8') as f:
-    #             f.write(res_line)
-    #     except Exception as e:
-    #         print(e)
-    #         continue
-    # with open(pth_sav, 'w+', encoding='utf-8') as f:
-    #     f.write(out_sav.strip())
+    main1()
+    # main2()
+    # main3()

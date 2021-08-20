@@ -411,11 +411,11 @@ def re_mapping_lsize(res4api_detect_line):
         cnt_grp[_cnt]['size'] = size
     cnts_size.sort(reverse=True)
     
-    # 求S_size和L_size, 后面进行替换为'S', 'L'
+    # 求S_size和L_size, 后面进行替换为'S', 'M'('L')
     if len(cnts_size) == 1:
         # 所有 r_line['size']设置为S
         for i, r_line in enumerate(res4api_detect_line):
-            r_line['size'] = 'S'
+            r_line['size'] = 'M'
         return
     c1,c2 = cnts_size[0], cnts_size[1]
     top1,top2 = cnt_grp[c1], cnt_grp[c2]
@@ -453,7 +453,9 @@ def re_mapping_lsize(res4api_detect_line):
     # S_grp --> S, L_grp --> L
     for i, r_line in enumerate(res4api_detect_line):
         lsize = r_line['size']
-        lsize = 'S' if lsize in S_grp else 'L'
+        jiapi = r_line['jiapi']
+        lsize = 'S' if lsize in S_grp else 'M'
+        lsize = 'S' if 'jiapi'==jiapi else 'M'
         r_line['size'] = lsize
 
 def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=False):
@@ -479,13 +481,14 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
     }
     cords_db_orig = [v['box'] for index,v in res_detect_line_db.items()]
 
-    # I. 
+    # I. 将坐标加上宽,长,宽长比等信息
     cords_craft_orig_ = [ conv_cords(cord) for cord in cords_craft_orig  ]
     cords_db_orig_ = [ conv_cords(cord) for cord in cords_db_orig  ]
     cords_orig_ = cords_craft_orig_ + cords_db_orig_
 
     # 过滤 宽w/长h > 1.1的框， RATIO_WH_FILTER 参数配置
     RATIO_WH_FILTER = 1.1  # 过滤 w/h > 1.05 ?  的框
+    # RATIO_WH_FILTER = 1.5  # 过滤 w/h > 1.05 ?  的框 原宽长比1.1,拟改成1.5
 
     W_AVG = np.mean([cord[-3] for cord in cords_orig_])
     H_AVG = np.mean([cord[-2] for cord in cords_orig_])
@@ -685,6 +688,8 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
         ygrp_uboxes = bigitem['ygrp_uboxes']
         bigboxes_subboxes[i]['uboxes_g'] = {}
         for j, ygrp_ubox in ygrp_uboxes.items():
+            # jiapi = 'normal'
+            # if len(ygrp_ubox) > 1: jiapi='jiapi'
             for _ubox in ygrp_ubox:
                 # x方向缩放10/7
                 _ubox = scale_x(_ubox, resize_x=(10/6))
@@ -693,6 +698,7 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
                 bigboxes_subboxes[i]['uboxes_g'][idx_ubox_g] = _ubox
                 idx_ubox_g+=1
 
+                # uboxes_g.append( (_ubox, jiapi) )
                 uboxes_g.append(_ubox)
         bigboxes_uboxes[i] = {
             'cords_big': bigbox,
@@ -708,8 +714,9 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
     # 查看新db的可视化，数字正好在矩形中间，字体大小合适
     uboxes_lurd = [[
         ub[0],ub[1], ub[2],ub[1], ub[2],ub[3], ub[0],ub[3]
+    # ] for (ub,jiapi) in uboxes_g]
     ] for ub in uboxes_g]
-    
+
     # 把bigbox用暗红色画出来，画在uboxes_g上（对于没有双行夹批的，大框替代所有小框并在x,y方向缩放0.96）
     bigboxes = [bigitem['cords_big'] for i, bigitem in bigboxes_subboxes.items()]
 
