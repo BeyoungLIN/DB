@@ -264,6 +264,29 @@ def bubble_sort(items):
     return items
 
 
+def rng_interact(rng1, rng2):
+    interacted = False
+    xmin1, xmax1 = rng1[0], rng1[1]
+    xmin2, xmax2 = rng2[0], rng2[1]
+    if xmin1 <= xmax2 and xmin2 <= xmax1: interacted = True
+    rng_u = [ min(xmin1, xmin2), max(xmax1, xmax2)]
+    return interacted, rng_u
+
+
+def get_w_rngs(widths, R=0.04):
+    w_sorted = sorted(widths)
+    w_rngs_tmp = [ [w*(1-R), w*(1+R)] for w in w_sorted ]
+    w_rngs, w_rng = [], w_rngs_tmp.pop(0)
+    for _rng in w_rngs_tmp:
+        interacted, rng_u = rng_interact(w_rng, _rng)
+        if interacted:
+            w_rng = rng_u
+        else:
+            w_rngs.append(w_rng)
+            w_rng = _rng
+    w_rngs.append(w_rng)
+    return w_rngs
+
 def check_order(dict_1, dict_2):
     '''
 

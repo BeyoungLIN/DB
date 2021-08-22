@@ -556,7 +556,7 @@ def randcolors(n=10):
 from postdetect import concat_boxes, get_w_rngs, get_line_size, re_mapping_lsize
 
 
-def ajust_boxes(pth_img, dbg=False):
+def ajust_boxes(pth_img, dbg=False,only_craft=False):
     test_one(pth_img)
 
     filename, file_ext = os.path.splitext(os.path.basename(pth_img))
@@ -577,7 +577,13 @@ def ajust_boxes(pth_img, dbg=False):
         c1 = f.read()
         res4api_detect_line_db = json.loads(c1)
 
+    # if only_craft==True:
+    #     concat_res = res4api_detect_line
+    # else:
+    #     concat_res = concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img=pth_img, dbg=dbg)
     concat_res = concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img=pth_img, dbg=dbg)
+    # concat_res = concat_boxes(res4api_detect_line, res4api_detect_line, pth_img=pth_img, dbg=dbg)
+
 
     # uboxes_g 切图后整体识别，重组结构（ubox_g， bigbox的识别文本存储）
     uboxes_g = concat_res['uboxes_g']

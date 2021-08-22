@@ -453,9 +453,9 @@ def re_mapping_lsize(res4api_detect_line):
     # S_grp --> S, L_grp --> L
     for i, r_line in enumerate(res4api_detect_line):
         lsize = r_line['size']
-        jiapi = r_line['jiapi']
+        # jiapi = r_line['jiapi']
         lsize = 'S' if lsize in S_grp else 'M'
-        lsize = 'S' if 'jiapi'==jiapi else 'M'
+        # lsize = 'S' if 'jiapi'==jiapi else 'M'
         r_line['size'] = lsize
 
 def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=False):
