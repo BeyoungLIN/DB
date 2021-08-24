@@ -263,7 +263,14 @@ def union_2box(box1, box2, cords_db):
     return [xmin,ymin, xmax,ymax]
 
 def union_subboxes(sub_boxes, cords_db, minDot, URatio=0.6):
+    # print(sub_boxes)
     sub_boxes.sort(key=lambda pt:pt[1])
+    # print(sub_boxes)
+    # pth_img = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg'
+    # pth_img_rect = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/output/000174rec.jpg'
+    # _sub_boxes = [[b[0], b[1], b[2], b[1], b[2], b[3], b[0], b[3]] for b in sub_boxes]
+    # pth_img_ubox = pth_img_rect.replace('rec.jpg', 'rec_ubox_after_sort.jpg')
+    # draw_box(_sub_boxes, pth_img, pth_img_ubox, color=(0, 128, 0), seqnum=True, thickness=1,text='0')
     boxes_union = []
     while len(sub_boxes)>0:
         # box_u = sub_boxes[0]

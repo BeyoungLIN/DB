@@ -142,6 +142,53 @@ def draw_box(cords, pth_img, pth_img_rect, color=(0, 0, 255), resize_x=1.0, thic
         traceback.print_exc()  # debug.error(e)
 
 
+def flat_box_processor(boxes_list=[]):
+    new_boxes_list = []
+    for boxes in boxes_list:
+        _cord = xmin, ymin, xmax, ymax = int(boxes[0]), int(boxes[1]), int(boxes[4]), int(boxes[5])
+        w = xmax - xmin
+        h = ymax - ymin
+        w_h = w / h
+        thres = 3
+        if w_h > 1.5:
+            adjust_x = (w - h * thres) / 2  # 右边框一般会多出来一点, 稍微减去一点, 默认是框了两个字, 0.3 应该是阈值, 174图此处接近0.5
+            left_box_x1, left_box_x2 = xmin, xmin + adjust_x  # 左框在后
+            right_box_x1, right_box_x2 = xmax - h * thres - adjust_x, xmax - h * thres
+            left_box = [left_box_x1, ymin, left_box_x2, ymin, left_box_x2, ymax, left_box_x1, ymax]
+            right_box = [right_box_x1, ymin, right_box_x2, ymin, right_box_x2, ymax, right_box_x1, ymax]
+            new_boxes_list.append(right_box)
+            new_boxes_list.append(left_box)
+        else:
+            new_boxes_list.append(boxes)
+
+    return new_boxes_list
+
+
+def con_line_boxes(boxes_list=[]):
+    new_boxes_list = []
+    boxes_list.sort(key=lambda pt: pt[0])
+
+
+    for boxes in boxes_list:
+        _cord = xmin, ymin, xmax, ymax = int(boxes[0]), int(boxes[1]), int(boxes[4]), int(boxes[5])
+        w = xmax - xmin
+        h = ymax - ymin
+        w_h = w / h
+        thres = 3
+        if w_h > 1.5:
+            adjust_x = (w - h * thres) / 2  # 右边框一般会多出来一点, 稍微减去一点, 默认是框了两个字, 0.3 应该是阈值, 174图此处接近0.5
+            left_box_x1, left_box_x2 = xmin, xmin + adjust_x  # 左框在后
+            right_box_x1, right_box_x2 = xmax - h * thres - adjust_x, xmax - h * thres
+            left_box = [left_box_x1, ymin, left_box_x2, ymin, left_box_x2, ymax, left_box_x1, ymax]
+            right_box = [right_box_x1, ymin, right_box_x2, ymin, right_box_x2, ymax, right_box_x1, ymax]
+            new_boxes_list.append(right_box)
+            new_boxes_list.append(left_box)
+        else:
+            new_boxes_list.append(boxes)
+
+    return new_boxes_list
+
+
 def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     # def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=False):
     filename, pth_sav_dir = '', ''
@@ -157,6 +204,8 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     }
     out_sav = ''
     cords_craft_orig = [v['box'] for index, v in res_detect_line.items()]
+    cords_craft_orig = flat_box_processor(cords_craft_orig)
+
 
     pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg') if not '' == pth_img else ''
     #
@@ -186,7 +235,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     # if dbg and not pth_img=='':
     if not pth_img == '':
         # 画craft框（红色）  END
-        draw_box(cords_craft_orig, pth_img, pth_img_rect)
+        draw_box(cords_craft_orig, pth_img, pth_img_rect, seqnum=True)
         # 在craft画框基础上，再画db框（蓝色）  END
         # draw_box(cords_db_orig, pth_img_rect, pth_img_rect, color=(255, 0, 0))
 
@@ -205,6 +254,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
 
     # II. 坐标转换(宽度缩放到0.7)
     cords, cords_craft, cords_db = [], [], []
+    # cords, cords_craft = [], []
     # 宽度缩放比例， RESIZE_X 参数配置
     RESIZE_X, RESIZE_Y = 0.7, 0.9
 
@@ -249,11 +299,11 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     if not pth_img == '':
         # 画craft框（红色）  END
         _cords_craft = [[c[0], c[1], c[2], c[1], c[2], c[3], c[0], c[3]] for c in cords_craft]
-        _cords_db = [[c[0], c[1], c[2], c[1], c[2], c[3], c[0], c[3]] for c in cords_db]
+        # _cords_db = [[c[0], c[1], c[2], c[1], c[2], c[3], c[0], c[3]] for c in cords_db]
         pth_img_rect_resize = os.path.join(pth_sav_dir, filename + 'rec_resize.jpg') if not '' == pth_img else ''
-        draw_box(_cords_craft, pth_img, pth_img_rect_resize)
+        draw_box(_cords_craft, pth_img, pth_img_rect_resize, seqnum=True)
         # 在craft画框基础上，再画db框（蓝色）  END
-        draw_box(_cords_db, pth_img_rect_resize, pth_img_rect_resize, color=(255, 0, 0))
+        # draw_box(_cords_db, pth_img_rect_resize, pth_img_rect_resize, color=(255, 0, 0))
 
     # III. x轴方向线段归并
     lines_union, line_u = [], lines[0]
@@ -287,7 +337,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     # 画大框
     if dbg:
         pth_img_with_bigbox = pth_img_rect.replace('rec.jpg', 'rec_bigbox.jpg')
-        draw_box(bigboxes, pth_img_rect_resize, pth_img_with_bigbox, color=(0, 128, 0), thickness=2)
+        draw_box(bigboxes, pth_img_rect_resize, pth_img_with_bigbox, color=(0, 128, 0), thickness=2, seqnum=True)
 
     # V. 过滤属于大框内的subbox
     cords.sort(key=lambda pt: pt[0], reverse=True)
@@ -308,7 +358,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
         pth_img_subbox = pth_img_rect.replace('rec.jpg', 'rec_subbox.jpg')
         pth_img_ubox = pth_img_rect.replace('rec.jpg', 'rec_ubox.jpg')
 
-        draw_box([bigboxes_subboxes[0]['cords_big']], pth_img, pth_img_subbox, color=colors_box[0], thickness=1,
+        draw_box([bigboxes_subboxes[0]['cords_big']], pth_img, pth_img_subbox, color=colors_box[0], thickness=1, seqnum=True,
                  text='0')
         for i, bigitem in bigboxes_subboxes.items():
             bigbox = bigitem['cords_big']
@@ -317,8 +367,8 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
             sub_boxes = [[b[0], b[1], b[2], b[1], b[2], b[3], b[0], b[3]] for b in _sub_boxes]
             color = colors_box[i]
             if i > 0:
-                draw_box([bigbox], pth_img_subbox, pth_img_subbox, color=color, thickness=1, text=str(i))
-            draw_box(sub_boxes, pth_img_subbox, pth_img_subbox, color=color, thickness=1)
+                draw_box([bigbox], pth_img_subbox, pth_img_subbox, color=color, thickness=1, seqnum=True, text=str(i))
+            draw_box(sub_boxes, pth_img_subbox, pth_img_subbox, color=color, seqnum=True, thickness=1)
         # END - 重新画大框 和 大框包含的子框 （大框和子框颜色相同，大框编号）
 
     # VI. 各大框内的subbox融合归并
@@ -334,7 +384,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
         pth_img_ubox = pth_img_rect.replace('rec.jpg', 'rec_ubox.jpg')
 
         # draw_box([ bigboxes_subboxes[0]['cords_big'] ], pth_img, pth_img_ubox, color=colors_box[0], thickness=1, text='0')
-        draw_box([bigboxes_subboxes[0]['cords_big']], pth_img, pth_img_ubox, color=color_ubox, thickness=1, text='0')
+        draw_box([bigboxes_subboxes[0]['cords_big']], pth_img, pth_img_ubox, color=color_ubox, seqnum=True, thickness=1, text='0')
         for i, bigitem in bigboxes_subboxes.items():
             bigbox = bigitem['cords_big']
             _uboxes = bigitem['uboxes']
@@ -342,8 +392,8 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
             uboxes = [[b[0], b[1], b[2], b[1], b[2], b[3], b[0], b[3]] for b in _uboxes]
             color = color_ubox  # colors_box[i]
             if i > 0:
-                draw_box([bigbox], pth_img_ubox, pth_img_ubox, color=color, thickness=1, text=str(i))
-            draw_box(uboxes, pth_img_ubox, pth_img_ubox, color=color, thickness=1)
+                draw_box([bigbox], pth_img_ubox, pth_img_ubox, color=color, thickness=1, seqnum=True, text=str(i))
+            draw_box(uboxes, pth_img_ubox, pth_img_ubox, color=color, thickness=1, seqnum=True)
         # END - 重新画大框 和 大框包含的融合后子框 （大框和子框颜色相同，大框编号）
 
     for i, bigitem in bigboxes_subboxes.items():
@@ -405,8 +455,9 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
 
     if not '' == pth_img:
         pth_img_uboxes_g = pth_img_rect.replace('rec.jpg', 'rec_uboxes_g.jpg')
-        draw_box(uboxes_lurd, pth_img, pth_img_uboxes_g, color=color_ubox, thickness=2, seqnum=True)
-        draw_box(bigboxes, pth_img_uboxes_g, pth_img_uboxes_g, color=(128, 0, 0), thickness=1, seqnum=True)
+        draw_box(uboxes_lurd, pth_img, pth_img_uboxes_g, color=(0, 0, 255), thickness=1, seqnum=True)
+        # draw_box(uboxes_lurd, pth_img, pth_img_uboxes_g, color=color_ubox, thickness=3, seqnum=True)
+        # draw_box(bigboxes, pth_img_uboxes_g, pth_img_uboxes_g, color=(128, 0, 0), thickness=1, seqnum=True)
 
     # VIII. 求框中位数，计算字体M, S（双行夹批）
 
@@ -480,11 +531,13 @@ def test_one(pth_img):
     # concat_res = concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img=pth_img, dbg=dbg)
 
     sorted_res_detect_line = res_detect_line_list
+
+    #
     # print(res_detect_line_list)
     cords = [cord['box'] for cord in sorted_res_detect_line]
 
     # 以下接入融合算法
-    concat_res = boxes_processor(res4api_detect_line, pth_img=pth_img)
+    concat_res = boxes_processor(res4api_detect_line, pth_img=pth_img, dbg=True)
     uboxes_g = concat_res['uboxes_g']
 
     bigboxes_uboxes = concat_res['bigboxes_uboxes']
@@ -500,13 +553,21 @@ def test_one(pth_img):
     ]
 
     widths_line = []
-    for cord_ in cords:
+    for index, cord in res_detect_line.items():
+        try:
+            x1, y1, x2, y2, x3, y3, x4, y4 = cord
+            min_x, max_x = round((x1 + x4) / 2), round((x2 + x3) / 2)
+            widths_line.append(abs(max_x - min_x))
+        except Exception as e:
+            print(e)
+            continue
+    # for cord_ in cords:
         '''
         预备后续非长方形框使用
         '''
         # x1, y1, x2, y2, x3, y3, x4, y4 = cord
         # min_x, max_x = round((x1 + x4) / 2), round((x2 + x3) / 2)
-        width = cord_[2] - cord_[0]
+        # width = cord_[2] - cord_[0]
         # cord_.append(width)
     w_sorted = sorted(widths_line)
     width_rngs = get_w_rngs(widths_line)
@@ -545,7 +606,8 @@ def test_one(pth_img):
     pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg') if not '' == pth_img else ''
     pth_img_with_size = pth_img_rect.replace('rec.jpg', 'rec_uboxes_size.jpg')
     draw_box(uboxes_lurd, pth_img, pth_img_with_size, color=(0, 128, 0), thickness=2, seqnum=True)
-    draw_box(bigboxes, pth_img_with_size, pth_img_with_size, color=(128, 0, 0), thickness=1, seqnum=True)
+    # draw_box(bigboxes, pth_img_with_size, pth_img_with_size, color=(128, 0, 0), thickness=2, seqnum=True)
+    # draw_box(bigboxes, pth_img_with_size, pth_img_with_size, color=(0, 0, 255), thickness=2, seqnum=True)
     # 输出带size的图
     for size, boxgrp in boxgrp_size.items():
         if len(boxgrp) == 0: continue
@@ -764,7 +826,8 @@ def test_char_detect_1(pth_img):
 
 if __name__ == '__main__':
     # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000011.jpg')
-    test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
+    test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg')
     # pth = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000018.jpg'
     # test_one(pth)
     # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/ER007_pure/20_19584_jpg/000024.jpg')

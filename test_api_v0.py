@@ -144,10 +144,10 @@ def draw_box(cords, pth_img, pth_img_rect, color=(0, 0, 255), resize_x=1.0, thic
 
             draw_1 = cv2.rectangle(img, (x, y), (x_, y_), color, thick)
             if seqnum:
-                draw_1 = cv2.putText(img, str(ibox), (int((x + x_) / 2 - 10), y + 20), font, 0.6, color=color)
+                draw_1 = cv2.putText(img, str(ibox), (int((x + x_) / 2 - 10), y - 20), font, 1, color=color)
             if not '' == text:
                 font = cv2.FONT_HERSHEY_SIMPLEX
-                draw_1 = cv2.putText(img, text, (int((x + x_) / 2 - 10), y + 16), font, 0.4, color=color)
+                draw_1 = cv2.putText(img, text, (int((x + x_) / 2 + 10), y - 1000), font, 0.4, color=color)
 
         # print('Writing to image with rectangle {}\n'.format(pth_img_rect))
 
