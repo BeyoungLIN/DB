@@ -18,10 +18,10 @@ import six
 from PIL import Image
 from sklearn.cluster import DBSCAN, MeanShift, OPTICS, Birch
 
+from pic_projection_2 import box_cut_vertical
 from postdetect import filter_subbox, randcolors, draw_line, line_interact, conv_cords, get_w_rngs, get_line_size, \
     union_subboxes, \
     ygroup_uboxes, re_mapping_lsize
-from pic_projection_2 import character_cut
 from zhtools.langconv import *
 
 # from skimage import io
@@ -128,7 +128,7 @@ def draw_box(cords, pth_img, pth_img_rect, color=(0, 0, 255), resize_x=1.0, thic
                                      thickness=2)
             if not '' == text:
                 font = cv2.FONT_HERSHEY_SIMPLEX
-                draw_1 = cv2.putText(img, text, (int((x + x_) / 2 -30), y), font, 1, color=color, thickness=2)
+                draw_1 = cv2.putText(img, text, (int((x + x_) / 2 - 30), y), font, 1, color=color, thickness=2)
 
         # print('Writing to image with rectangle {}\n'.format(pth_img_rect))
         cv_imwrite(pth_img_rect, draw_1)  # 解决中文路径文件的写
@@ -142,7 +142,217 @@ def draw_box(cords, pth_img, pth_img_rect, color=(0, 0, 255), resize_x=1.0, thic
         print(exc_type, e.__str__(), ',File', fname, ',line ', exc_tb.tb_lineno)
         traceback.print_exc()  # debug.error(e)
 
+def split(a):  # 获取各行起点和终点
+    # b是a的非0元素的下标 组成的数组 (np格式),同时也是高度的值
+    b = np.transpose(np.nonzero(a))
+    # print(b,type(b))
+    # print(a,b.tolist())
 
+    star = []
+    end = []
+    star.append(int(b[0]))
+    for i in range(len(b) - 1):
+        cha_dic = int(b[i + 1]) - int(b[i])
+        if cha_dic > 1:
+            # print(cha_dic,int(b[i]),int(b[i+1]))
+            end.append(int(b[i]))
+            star.append(int(b[i + 1]))
+    end.append(int(b[len(b) - 1]))
+    # print(star) # [13, 50, 87, 124, 161]
+    # print(end)  # [36, 73, 110, 147,184]
+    return star, end
+
+def scan_vertical_shadow(img, img_bi):  # 垂直投影+分割
+    # 1.垂直投影
+    h, w = img_bi.shape
+    shadow_v = img_bi.copy()
+    a = [0 for z in range(0, w)]
+    # print(a) #a = [0,0,0,0,0,0,0,0,0,0,...,0,0]初始化一个长度为w的数组，用于记录每一列的黑点个数
+
+    # print('h = ', h)
+    # print('w = ', w)
+    # 记录每一列的波峰
+    for j in range(0, w):  # 遍历一列
+        for i in range(0, h):  # 遍历一行
+            if shadow_v[i, j] == 0:  # 如果该点为黑点(默认白底黑字)
+                a[j] += 1  # 该列的计数器加一计数
+                shadow_v[i, j] = 255  # 记录完后将其变为白色
+                # print (j)
+    for j in range(0, w):  # 遍历每一列
+        for i in range((h - a[j]), h):  # 从该列应该变黑的最顶部的点开始向最底部涂黑
+            shadow_v[i, j] = 0  # 涂黑
+
+    return a
+
+def bi_scan_box(mini_h, xmin, xmax, ymin, ymax, shadow_v):
+    x_new = [xmin, xmax]
+    w = xmax - xmin
+    h = ymax - ymin
+    x_mid = int(w/2)
+    x_quarter = int(w/4)
+    x_eighth = int(w/8)
+    x_sixteenth = int(w/16)
+    count = 0
+    direction = -1
+    # while x_new[1] - x_new[0] <= 3 :
+    while count < 2:
+        for j in range(1 * x_quarter, x_mid):
+            line_sum = 0
+            for k in range(ymin, ymax):
+                # print(x_mid + direction * j, k, shadow_v[k, x_mid + direction * j])
+                x_move = x_mid + direction * j
+                if shadow_v[k, x_move] == 0:
+                    break
+                else:
+                    line_sum += shadow_v[k, x_move]
+            if line_sum == 255 * h:
+                x_new.pop(count)
+                x_new.insert(count, x_move)
+                break
+        direction = 1
+        count += 1
+        # x_mid = int(x_mid / 2)
+    print(x_new)
+    x1_new, x2_new = x_new[0], x_new[1]
+    if x2_new - x1_new < mini_h:
+        x1_new, x2_new = xmin, xmax
+    return x1_new, x2_new
+
+
+def bi_scan_box_whole_pic(mini_h, xmin, xmax, ymin, ymax, shadow_v):
+    x_new = [xmin, xmax]
+    # print('原始', x_new)
+    w = xmax - xmin
+    h = ymax - ymin
+    x_mid_pic = int((xmin + xmax) / 2)
+    x_quarter = int(w / 4)
+    x_eighth = int(w / 8)
+    x_sixteenth = int(w / 16)
+    count = 0
+    direction = -1
+    # while x_new[1] - x_new[0] <= 3 :
+    while count < 2:
+        # for j in range(1 * x_eighth, 3 * x_quarter):
+        for j in range(1 * x_eighth, 3 * x_quarter):
+            line_sum = 0
+            for k in range(ymin, ymax):
+                # print(x_mid + direction * j, k, shadow_v[k, x_mid + direction * j])
+                x_move = x_mid_pic + direction * j
+                line_sum += shadow_v[k, x_move]
+                # if shadow_v[k, x_move] == 0:
+                #     break
+                # else:
+                #     line_sum += shadow_v[k, x_move]
+            # if line_sum >= 255 * (h - 1):
+            if line_sum >= 255 * h:
+                # print(line_sum)
+                x_new.pop(count)
+                x_new.insert(count, x_move)
+                break
+            elif line_sum == 0:  # 全黑问题处理
+                char_w = h
+                # x_new.pop(count)
+                if count == 0:
+                    x_new = [xmax - char_w, xmax]
+                else:
+                    x_new = [xmin, xmin + char_w]
+                shadow_v_np = np.array(shadow_v)
+                if np.count_nonzero(shadow_v_np):
+                    return [0, 0]
+                break
+        direction = 1
+        count += 1
+        # x_mid = int(x_mid / 2)
+    x1_new, x2_new = x_new[0], x_new[1]
+    H = min(mini_h, 70)
+    if (x2_new - x1_new < H) or (h / (x2_new - x1_new) <= 1.2):  # w 54 h 59  59/54 = 1.09, w 71 h 61 h/w = 1.16
+        x1_new, x2_new = xmin, xmax
+    # print(x_new, x2_new - x1_new, mini_h)
+    # print('返回值', x1_new, x2_new)
+    return x1_new, x2_new
+
+
+def box_scan_vertical(shadow_v, mini_h, xmin, xmax, ymin, ymax):  # 扫描得到最小左右框
+    # h, w = img_bi.shape
+    # h = ymax - ymin
+    # shadow_v = img_bi.copy()
+    # a = [0 for z in range(0, w)]
+    # x_mid = int(w / 2)
+    # for i in range(0, h):
+    #     if shadow_v[x_quarter1, i] == 0:
+    #         direction = -1
+    # x1_new, x2_new = bi_scan_box(mini_h, xmin, xmax, ymin, ymax, shadow_v)
+    x1_new, x2_new = bi_scan_box_whole_pic(mini_h, xmin, xmax, ymin, ymax, shadow_v)
+    # print('box_scan_vertical', x1_new, x2_new)
+    # while x2_new - x1_new <= 2:
+    #     w = int(w / 2)
+    #     x1_new, x2_new = bi_scan_box(h, w, shadow_v)
+    return x1_new, x2_new
+
+
+# def scan_margin(boxes_list=[], ):
+def scan_minibox(boxes_list=[], img=''):
+    # 读取要被切割的图片
+    img = cv2.imread(img)
+    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    thresh, img_bi = cv2.threshold(img_gray, 130, 255, cv2.THRESH_BINARY)
+    shadow_v = img_bi.copy()
+    h_list = []
+    for boxes in boxes_list:
+        h_list.append(boxes[5] - boxes[1])
+        # _cord = xmin, ymin, xmax, ymax = int(boxes[0]), int(boxes[1]), int(boxes[4]), int(boxes[5])
+
+    mini_h = min(h_list)
+    # print(h_list)
+
+    new_boxes_list = []
+    for boxes in boxes_list:
+        _cord = xmin, ymin, xmax, ymax = int(boxes[0]), int(boxes[1]), int(boxes[4]), int(boxes[5])
+        # # 要被切割的开始的像素的高度值
+        # beH = 60
+        # # 要被切割的结束的像素的高度值
+        # hEnd = 232
+        # # 要被切割的开始的像素的宽度值
+        # beW = 43
+        # # 要被切割的结束的像素的宽度值
+        # wLen = 265
+        # # 对图片进行切割
+        # dstImg = img_gray[ymin:ymax, xmin:xmax]
+        # dstImg_bi = img_bi[ymin:ymax, xmin:xmax]
+        # x1_, x2_ = box_scan_vertical(dstImg, dstImg_bi, mini_h)  # 输入图片 和 二值图, 即可进行字符分割
+        x1_, x2_ = box_scan_vertical(shadow_v, mini_h, xmin, xmax, ymin, ymax)  # 输入图片 和 二值图, 即可进行字符分割
+        # new_x1, new_x2 = xmin + x1_, xmin + x2_
+        new_x1, new_x2 = x1_, x2_
+        # print(new_x1, new_x2)
+        if not new_x1 == new_x2 == 0:
+            new_box = [new_x1, ymin, new_x2, ymin, new_x2, ymax, new_x1, ymax]
+            new_boxes_list.append(new_box)
+        # 展示原图
+        # cv2.imshow("img", img)
+        # 展示切割好的图片
+        # dstImg_mini = img_gray[ymin:ymax, new_x1:new_x2]
+        # cv2.imshow("dstImg", dstImg_mini)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
+        # if not (new_x1 == None and new_x2 == None):
+        # if not (new_x1 == new_x2):
+        #     展示切割好的图片
+            # dstImg_mini = img_gray[ymin:ymax, new_x1:new_x2]
+            # cv2.imshow("dstImg", dstImg_mini)
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
+            # new_box = [new_x1, ymin, new_x2, ymin, new_x2, ymax, new_x1, ymax]
+            # new_boxes_list.append(new_box)
+
+        # else:
+        #     new_boxes_list.append(boxes)
+    # print(new_boxes_list)
+
+    return new_boxes_list
+
+
+# 解决两字一框问题
 def flat_box_processor(boxes_list=[]):
     new_boxes_list = []
     for boxes in boxes_list:
@@ -151,10 +361,15 @@ def flat_box_processor(boxes_list=[]):
         h = ymax - ymin
         w_h = w / h
         thres = 0.2
-        if w_h > 1.8:
-            adjust_x = (w - h * thres) / 2  # 右边框一般会多出来一点, 稍微减去一点, 默认是框了两个字, 0.3 应该是阈值, 174图此处接近0.5
+        '''
+        相关参考 109/65 = 1.67
+        '''
+        if w_h > 1.6:
+            # adjust_x = (w - h * thres) / 2  # 右边框一般会多出来一点, 稍微减去一点, 默认是框了两个字, 0.3 应该是阈值, 174图此处接近0.5
+            adjust_x = w / 2
             left_box_x1, left_box_x2 = xmin, xmin + adjust_x  # 左框在后
-            right_box_x1, right_box_x2 = xmax - h * thres - adjust_x, xmax - h * thres
+            # right_box_x1, right_box_x2 = xmax - h * thres - adjust_x, xmax - h * thres
+            right_box_x1, right_box_x2 = xmax - adjust_x, xmax
             left_box = [left_box_x1, ymin, left_box_x2, ymin, left_box_x2, ymax, left_box_x1, ymax]
             right_box = [right_box_x1, ymin, right_box_x2, ymin, right_box_x2, ymax, right_box_x1, ymax]
             new_boxes_list.append(right_box)
@@ -171,14 +386,16 @@ def con_line_boxes(boxes_list=[]):
     # boxes_list.sort(key=lambda pt: pt[0], reverse=True)
     for i in range(1, len(boxes_list)):
         # for boxes in boxes_list:
-        _cord = xmin, ymin, xmax, ymax = int(boxes_list[i - 1][0]), int(boxes_list[i - 1][1]), int(boxes_list[i - 1][4]), int(boxes_list[i - 1][5])
+        _cord = xmin, ymin, xmax, ymax = int(boxes_list[i - 1][0]), int(boxes_list[i - 1][1]), int(
+            boxes_list[i - 1][4]), int(boxes_list[i - 1][5])
         # _cord = xmin, ymin, xmax, ymax = int(boxes_list[i][0]), int(boxes_list[i][1]), int(boxes_list[i][4]), int(boxes_list[i][5])
         # for j in range(i, len(boxes_list)):
         #     if not j == i:
-        _cord_next = xmin2, ymin2, xmax2, ymax2 = int(boxes_list[i][0]), int(boxes_list[i][1]), int(boxes_list[i][4]), int(boxes_list[i][5])
+        _cord_next = xmin2, ymin2, xmax2, ymax2 = int(boxes_list[i][0]), int(boxes_list[i][1]), int(
+            boxes_list[i][4]), int(boxes_list[i][5])
         # _cord_next = xmin2, ymin2, xmax2, ymax2 = int(boxes_list[j][0]), int(boxes_list[j][1]), int(boxes_list[j][4]), int(boxes_list[j][5])
-        if (abs(xmin2 - xmin) < 15) and (abs(xmax2 - xmax) < 30) and (
-                abs(ymax2 - ymin) < 150 or abs(ymax - ymin2) < 150):
+        if (abs(xmin2 - xmin) < 15) and (abs(xmax2 - xmax) < 15) and (
+                abs(ymax2 - ymin) < 200 or abs(ymax - ymin2) < 200):
             x1, x2, y1, y2 = min(xmin, xmin2), min(xmax, xmax2), min(ymin, ymin2), max(ymax, ymax2)  # 这里右边用min x
             new_box = [x1, y1, x2, y1, x2, y2, x1, y2]
             new_boxes_list.append(new_box)
@@ -194,45 +411,85 @@ def con_line_boxes(boxes_list=[]):
     return new_boxes_list
 
 
-def con_line_boxes_test(boxes_list=[]):
+def con_line_boxes_two_point(boxes_list=[]):
     flag = True
     new_boxes_list = []
     # boxes_list.sort(key=lambda pt: pt[0], reverse=True)
-    for i in range(0, len(boxes_list)):
+    for i in range(1, len(boxes_list)):
         # for boxes in boxes_list:
-        # _cord = xmin, ymin, xmax, ymax = int(boxes_list[i - 1][0]), int(boxes_list[i - 1][1]), int(boxes_list[i - 1][4]), int(boxes_list[i - 1][5])
-        _cord = xmin, ymin, xmax, ymax = int(boxes_list[i][0]), int(boxes_list[i][1]), int(boxes_list[i][4]), int(boxes_list[i][5])
-        for j in range(i, len(boxes_list)):
-            if not j == i:
-            # _cord_next = xmin2, ymin2, xmax2, ymax2 = int(boxes_list[i][0]), int(boxes_list[i][1]), int(boxes_list[i][4]), int(boxes_list[i][5])
-                _cord_next = xmin2, ymin2, xmax2, ymax2 = int(boxes_list[j][0]), int(boxes_list[j][1]), int(boxes_list[j][4]), int(boxes_list[j][5])
-                if (abs(xmin2 - xmin) < 15) and (abs(xmax2 - xmax) < 30) and (
-                        abs(ymax2 - ymin) < 70 or abs(ymax - ymin2) < 70):
-                    x1, x2, y1, y2 = min(xmin, xmin2), min(xmax, xmax2), min(ymin, ymin2), max(ymax, ymax2)  # 这里右边用min x
-                    new_box = [x1, y1, x2, y1, x2, y2, x1, y2]
-                    new_boxes_list.append(new_box)
-                    flag = False
-                    break
-                else:
-                    # new_boxes_list.append(boxes_list[i - 1])
-                    if flag:
-                        new_boxes_list.append(boxes_list[i])
-                    else:
-                        flag = True
+        _cord = xmin, ymin, xmax, ymax = int(boxes_list[i - 1][0]), int(boxes_list[i - 1][1]), int(
+            boxes_list[i - 1][2]), int(boxes_list[i - 1][3])
+        # _cord = xmin, ymin, xmax, ymax = int(boxes_list[i][0]), int(boxes_list[i][1]), int(boxes_list[i][4]), int(boxes_list[i][5])
+        # for j in range(i, len(boxes_list)):
+        #     if not j == i:
+        _cord_next = xmin2, ymin2, xmax2, ymax2 = int(boxes_list[i][0]), int(boxes_list[i][1]), int(
+            boxes_list[i][2]), int(boxes_list[i][3])
+        # _cord_next = xmin2, ymin2, xmax2, ymax2 = int(boxes_list[j][0]), int(boxes_list[j][1]), int(boxes_list[j][4]), int(boxes_list[j][5])
+        if (abs(xmin2 - xmin) < 15) and (abs(xmax2 - xmax) < 30) \
+                and (abs(ymax2 - ymin) < 250 or abs(ymax - ymin2) < 250):
+            x1, x2, y1, y2 = min(xmin, xmin2), max(xmax, xmax2), min(ymin, ymin2), max(ymax, ymax2)  # 这里右边用min x
+            new_box = [x1, y1, x2, y2]
+            new_boxes_list.append(new_box)
+            flag = False
+        else:
+            # new_boxes_list.append(boxes_list[i - 1])
+            if flag:
+                new_boxes_list.append(boxes_list[i - 1])
+            else:
+                flag = True
     new_boxes_list.append(boxes_list[-1])
 
     return new_boxes_list
 
 
-def minimize_box(boxes_list=[], img):
+def con_line_boxes_test(boxes_list=[]):
+    flag = False
+    new_boxes_list = boxes_list
+    # boxes_list.sort(key=lambda pt: pt[0], reverse=True)
+    if len(new_boxes_list) > 1:
+        while not flag:
+            for i in range(1, len(new_boxes_list)):
+                # for boxes in boxes_list:
+                _cord = xmin, ymin, xmax, ymax = int(new_boxes_list[i - 1][0]), int(new_boxes_list[i - 1][1]), int(
+                    new_boxes_list[i - 1][4]), int(new_boxes_list[i - 1][5])
+                # _cord = xmin, ymin, xmax, ymax = int(boxes_list[i][0]), int(boxes_list[i][1]), int(boxes_list[i][4]), int(boxes_list[i][5])
+                # for j in range(i, len(boxes_list)):
+                #     if not j == i:
+                _cord_next = xmin2, ymin2, xmax2, ymax2 = int(new_boxes_list[i][0]), int(new_boxes_list[i][1]), int(
+                    new_boxes_list[i][4]), int(new_boxes_list[i][5])
+                # _cord_next = xmin2, ymin2, xmax2, ymax2 = int(boxes_list[j][0]), int(boxes_list[j][1]), int(boxes_list[j][4]), int(boxes_list[j][5])
+                if (abs(xmin2 - xmin) < 15) and (abs(xmax2 - xmax) < 15) and (
+                        (abs(ymax2 - ymin) < 100) or (abs(ymax - ymin2) < 100)):
+                    x1, x2, y1, y2 = min(xmin, xmin2), max(xmax, xmax2), min(ymin, ymin2), max(ymax,
+                                                                                               ymax2)  # 这里右边用min x
+                    new_box = [x1, y1, x2, y1, x2, y2, x1, y2]
+                    new_boxes_list.pop(i - 1)
+                    new_boxes_list.pop(i - 1)
+                    new_boxes_list.insert(i - 1, new_box)
+                    flag = False
+                    break
+                else:
+                    flag = True
+                    # new_boxes_list.append(boxes_list[i - 1])
+                    # if flag:
+                    #     new_boxes_list.append(boxes_list[i - 1])
+                    # else:
+                    #     flag = True
+        # new_boxes_list.append(boxes_list[-1])
+
+    return new_boxes_list
+
+
+def minimize_box(boxes_list=[], img=''):
     # 读取要被切割的图片
     img = cv2.imread(img)
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     thresh, img_bi = cv2.threshold(img_gray, 130, 255, cv2.THRESH_BINARY)
 
-
     new_boxes_list = []
+    flag = 0
     for boxes in boxes_list:
+        flag += 1
         _cord = xmin, ymin, xmax, ymax = int(boxes[0]), int(boxes[1]), int(boxes[4]), int(boxes[5])
         # # 要被切割的开始的像素的高度值
         # beH = 60
@@ -245,30 +502,28 @@ def minimize_box(boxes_list=[], img):
         # # 对图片进行切割
         dstImg = img_gray[ymin:ymax, xmin:xmax]
         dstImg_bi = img_bi[ymin:ymax, xmin:xmax]
-        character_cut(dstImg, dstImg_bi)  # 输入图片 和 二值图, 即可进行字符分割
+        x1_, x2_ = box_cut_vertical(dstImg, dstImg_bi)  # 输入图片 和 二值图, 即可进行字符分割
 
-
+        if not ((x1_ == x2_) or (x1_ == None) or (x2_ == None)):
+            new_x1, new_x2 = xmin + x1_, xmin + x2_
             # 展示原图
-        cv2.imshow("img", img)
-        # 展示切割好的图片
-        cv2.imshow("dstImg", dstImg)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+            # cv2.imshow("img", img)
+            # 展示切割好的图片
+            # dstImg_mini = img_gray[ymin:ymax, new_x1:new_x2]
+            # cv2.imshow("dstImg", dstImg_mini)
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
 
-        w = xmax - xmin
-        h = ymax - ymin
-        w_h = w / h
-        thres = 0.2
-        if w_h > 1.8:
-            adjust_x = (w - h * thres) / 2  # 右边框一般会多出来一点, 稍微减去一点, 默认是框了两个字, 0.3 应该是阈值, 174图此处接近0.5
-            left_box_x1, left_box_x2 = xmin, xmin + adjust_x  # 左框在后
-            right_box_x1, right_box_x2 = xmax - h * thres - adjust_x, xmax - h * thres
-            left_box = [left_box_x1, ymin, left_box_x2, ymin, left_box_x2, ymax, left_box_x1, ymax]
-            right_box = [right_box_x1, ymin, right_box_x2, ymin, right_box_x2, ymax, right_box_x1, ymax]
-            new_boxes_list.append(right_box)
-            new_boxes_list.append(left_box)
-        else:
-            new_boxes_list.append(boxes)
+            # if not (new_x1 == None and new_x2 == None):
+            # 展示切割好的图片
+            # dstImg_mini = img_gray[ymin:ymax, new_x1:new_x2]
+            # cv2.imshow("dstImg", dstImg_mini)
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
+            new_box = [new_x1, ymin, new_x2, ymin, new_x2, ymax, new_x1, ymax]
+            new_boxes_list.append(new_box)
+        # else:
+        #     new_boxes_list.append(boxes)
 
     return new_boxes_list
 
@@ -288,11 +543,15 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     }
     out_sav = ''
     cords_craft_orig = [v['box'] for index, v in res_detect_line.items()]
+    cords_craft_orig_backup = [v['box'] for index, v in res_detect_line.items()]
 
+    cords_craft_orig = minimize_box(cords_craft_orig, pth_img)
     cords_craft_orig = flat_box_processor(cords_craft_orig)
+    cords_craft_orig = scan_minibox(cords_craft_orig, pth_img)
+    # print(cords_craft_orig)
     # cords_craft_orig = con_line_boxes_test(cords_craft_orig)
-    cords_craft_orig = con_line_boxes(cords_craft_orig)
-    cords_craft_orig = con_line_boxes(cords_craft_orig)  # 目前来看少做一次会丢框
+    # cords_craft_orig = con_line_boxes(cords_craft_orig)
+    # cords_craft_orig = con_line_boxes(cords_craft_orig)  # 目前来看少做一次会丢框
 
     pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg') if not '' == pth_img else ''
     #
@@ -305,6 +564,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
 
     # I. 将坐标加上宽,长,宽长比等信息
     cords_craft_orig_ = [conv_cords(cord) for cord in cords_craft_orig]
+    # cords_craft_orig_backup_ = [conv_cords(cord) for cord in cords_craft_orig_backup]
     # cords_db_orig_ = [conv_cords(cord) for cord in cords_db_orig]
     # cords_orig_ = cords_craft_orig_ + cords_db_orig_
     cords_orig_ = cords_craft_orig_
@@ -322,9 +582,12 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     # if dbg and not pth_img=='':
     if not pth_img == '':
         # 画craft框（红色）  END
+        # print(cord_craft_orig for cord_craft_orig in cords_craft_orig)
+        for i in range(len(cords_craft_orig)):
+            print(i, cords_craft_orig[i])
         draw_box(cords_craft_orig, pth_img, pth_img_rect, seqnum=True)
-        # 在craft画框基础上，再画db框（蓝色）  END
-        # draw_box(cords_db_orig, pth_img_rect, pth_img_rect, color=(255, 0, 0))
+        # 在优化框基础上，再画原craft框（蓝色）  END
+        draw_box(cords_craft_orig_backup, pth_img_rect, pth_img_rect, color=(255, 0, 0))
 
     # 改变初始过滤策略:过滤交叉>=3的框 -- BEGIN
     _Xmin = min([c_d[0] for c_d in cords_orig_])
@@ -343,7 +606,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     cords, cords_craft, cords_db = [], [], []
     # cords, cords_craft = [], []
     # 宽度缩放比例， RESIZE_X 参数配置
-    RESIZE_X, RESIZE_Y = 0.7, 0.9
+    RESIZE_X, RESIZE_Y = 0.9, 1
 
     for cord in cords_orig_:  # x方向坐标压缩（避免横向不同大框之间的框交错）
         _cord = xmin, ymin, xmax, ymax = cord[0], cord[1], cord[2], cord[3]
@@ -351,13 +614,17 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
             _cord = list(scale_x(_cord, RESIZE_X))
             _cord = list(scale_y(_cord, RESIZE_Y))
         cords.append(_cord)
+    cords_craft = cords
+    # cords_db = cords
+    # cords = cords_orig_
 
-    for cord_cft in cords_craft_orig:
-        _cord_cft = int(cord_cft[0]), int(cord_cft[1]), int(cord_cft[4]), int(cord_cft[5])
-        if RESIZE_X < 1.0:
-            _cord_cft = list(scale_x(_cord_cft, RESIZE_X))
-            _cord_cft = list(scale_y(_cord_cft, RESIZE_Y))
-        cords_craft.append(_cord_cft)
+    # for cord_cft in cords_craft_orig:
+    #     _cord_cft = int(cord_cft[0]), int(cord_cft[1]), int(cord_cft[4]), int(cord_cft[5])
+    #     if RESIZE_X < 1.0:
+    #         _cord_cft = list(scale_x(_cord_cft, RESIZE_X))
+    #         _cord_cft = list(scale_y(_cord_cft, RESIZE_Y))
+    #     cords_craft.append(_cord_cft)
+    cords_craft = cords_craft_orig
 
     # for cord_db in cords_db_orig:
     #     _cord_db = int(cord_db[0]), int(cord_db[1]), int(cord_db[4]), int(cord_db[5])
@@ -365,6 +632,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     #         _cord_db = list(scale_x(_cord_db, RESIZE_X))
     #         _cord_db = list(scale_y(_cord_db, RESIZE_Y))
     #     cords_db.append(_cord_db)
+    # cords_db = cords
 
     # 求全局XMIN, YMIN, XMAX, YMAX
     Xmin = min([c_d[0] for c_d in cords])
@@ -386,9 +654,9 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     if not pth_img == '':
         # 画craft框（红色）  END
         _cords_craft = [[c[0], c[1], c[2], c[1], c[2], c[3], c[0], c[3]] for c in cords_craft]
-        # _cords_db = [[c[0], c[1], c[2], c[1], c[2], c[3], c[0], c[3]] for c in cords_db]
+        _cords_db = [[c[0], c[1], c[2], c[1], c[2], c[3], c[0], c[3]] for c in cords_db]
         pth_img_rect_resize = os.path.join(pth_sav_dir, filename + 'rec_resize.jpg') if not '' == pth_img else ''
-        draw_box(_cords_craft, pth_img, pth_img_rect_resize, seqnum=True)
+        draw_box(cords_craft_orig, pth_img, pth_img_rect_resize, seqnum=True)
         # 在craft画框基础上，再画db框（蓝色）  END
         # draw_box(_cords_db, pth_img_rect_resize, pth_img_rect_resize, color=(255, 0, 0))
 
@@ -421,6 +689,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
         _xmax, _ymin = bbp_pre = bigboxes_points[i - 1]
         bigbox = [_xmin + 4, _ymin, _xmax - 4, _ymin, _xmax - 4, Ymax + 5, _xmin + 4, Ymax + 5]
         bigboxes.append(bigbox)
+
     # 画大框
     if dbg:
         pth_img_with_bigbox = pth_img_rect.replace('rec.jpg', 'rec_bigbox.jpg')
@@ -428,6 +697,10 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
 
     # V. 过滤属于大框内的subbox
     cords.sort(key=lambda pt: pt[0], reverse=True)
+    # cords = con_line_boxes_two_point(cords)
+    # cords = con_line_boxes_two_point(cords)
+    # cords = con_line_boxes_two_point(cords)
+
     # print(cords)
     bigboxes_subboxes = {
         i: {
@@ -460,6 +733,8 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
         # END - 重新画大框 和 大框包含的子框 （大框和子框颜色相同，大框编号）
 
     # VI. 各大框内的subbox融合归并
+    # bigitem['sub_boxes'] = con_line_boxes_two_point(bigitem['sub_boxes'])
+    # bigitem['sub_boxes'] = con_line_boxes_two_point(bigitem['sub_boxes'])
     for i, bigitem in bigboxes_subboxes.items():
         sub_boxes = bigitem['sub_boxes']
         uboxes = union_subboxes(sub_boxes, cords_db, minDot=(Xmin, Ymin))
@@ -514,9 +789,11 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
             # if len(ygrp_ubox) > 1: jiapi='jiapi'
             for _ubox in ygrp_ubox:
                 # x方向缩放10/7
-                _ubox = scale_x(_ubox, resize_x=(10 / 6))
+                # _ubox = scale_x(_ubox, resize_x=(10 / 6))
+                _ubox = scale_x(_ubox, resize_x=(10 / 9))
                 # y方向缩放10/9
-                _ubox = scale_y(_ubox, resize_y=(10 / 9))
+                # _ubox = scale_y(_ubox, resize_y=(10 / 9))
+                # _ubox = scale_y(_ubox, resize_y=(10 / 10))
                 bigboxes_subboxes[i]['uboxes_g'][idx_ubox_g] = _ubox
                 idx_ubox_g += 1
 
@@ -556,7 +833,7 @@ def boxes_processor(res4api_detect_line, pth_img='', dbg=False):
     # 重叠矩形(可能是ubox) 判断逻辑
 
 
-def test_one(pth_img):
+def test_one(pth_img, dbg=False):
     img = readPILImg(pth_img)
 
     filename, file_ext = os.path.splitext(os.path.basename(pth_img))
@@ -569,8 +846,8 @@ def test_one(pth_img):
     pth_sav = os.path.join(pth_sav_dir, filename + '_res_recog.txt')
     save_folder = os.path.join(pth_sav_dir, filename)
 
-    if not os.path.exists(save_folder):
-        os.makedirs(save_folder)
+    # if not os.path.exists(save_folder):
+    #     os.makedirs(save_folder)
     # if os.path.exists(pth_sav):
     #     print('{} already exists'.format(pth_sav))
     #     return
@@ -590,15 +867,21 @@ def test_one(pth_img):
     }
 
     img = readPILImg(pth_img)
-
-    # res4api_detect_line = request_api(url_page_recog_0, param_recog, _auth)
+    # 0 craft_字
+    res4api_detect_line = request_api(url_page_recog_0, param_recog, _auth)
+    # 1 DB 测试
     # res4api_detect_line = request_api(url_page_recog_1, param_recog, _auth)
-    res4api_detect_line = request_api(url_page_recog, param_recog, _auth)
+    # 2 craft行测试
+    # res4api_detect_line = request_api(url_page_recog, param_recog, _auth)
     # print(res4api_detect_line)
 
     # res_detect_line = {
     #     int(itm['name']): {'box': [float(pt) for pt in itm['box']], 'text': itm['text']} for itm in res4api_detect_line
     # }
+    res_box = [
+        [int(pt) for pt in itm['box']] for itm in res4api_detect_line
+    ]
+    print(res_box)
     '''
     {0: {'box': [1047.0, 32.0, 1123.0, 32.0, 1123.0, 1696.0, 1047.0, 1696.0], 'text': '濟之闢釋氏長孫之表五經唐名流如太白柳州宋'}}
     '''
@@ -626,8 +909,9 @@ def test_one(pth_img):
     # cords = [cord['box'] for cord in sorted_res_detect_line]
 
     # 以下接入融合算法
-    concat_res = boxes_processor(res4api_detect_line, pth_img=pth_img, dbg=False)
+    concat_res = boxes_processor(res4api_detect_line, pth_img=pth_img, dbg=dbg)
     uboxes_g = concat_res['uboxes_g']
+    # print(res4api_detect_line)
 
     bigboxes_uboxes = concat_res['bigboxes_uboxes']
     res_detect_line = {i: [ub[0], ub[1], ub[2], ub[1], ub[2], ub[3], ub[0], ub[3]] \
@@ -640,6 +924,7 @@ def test_one(pth_img):
             'text': ''
         } for i, box in res_detect_line.items()
     ]
+    # print(res4api_detect_line)
 
     widths_line = []
     for index, cord in res_detect_line.items():
@@ -659,7 +944,7 @@ def test_one(pth_img):
         # width = cord_[2] - cord_[0]
         # cord_.append(width)
     w_sorted = sorted(widths_line)
-    width_rngs = get_w_rngs(widths_line)
+    width_rngs = get_w_rngs(widths_line, R=0.065)  #er适合0.07
     print(w_sorted)
     print(width_rngs)
 
@@ -670,9 +955,9 @@ def test_one(pth_img):
         x1, y1, x2, y2, x3, y3, x4, y4 = [int(cord) for cord in box_line]
         min_x, max_x = round((x1 + x4) / 2), round((x2 + x3) / 2)
         min_y, max_y = round((y1 + y2) / 2), round((y3 + y4) / 2)
-        width_line = abs(max_x - min_x)
+        width_line = abs(max_x - min_x)  # 再次得到宽度
 
-        line_size = get_line_size(width_rngs, width_line)
+        line_size = get_line_size(width_rngs, width_line)  # 聚出的类和该列宽度
         r_line['size'] = line_size
 
         boxgrp_size[line_size].append(box_line)
@@ -916,8 +1201,38 @@ def test_char_detect_1(pth_img):
 if __name__ == '__main__':
     # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000011.jpg')
     # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
-    test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg')
-    # pth = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000018.jpg'
-    # test_one(pth)
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg')  # 断行
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000386.jpg')  # 黑方块问题,已解决
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000032.jpg')  # 融合行过于相邻
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000783.jpg', dbg=True)  # SM问题,识别时把其一融入,只有一个M
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000231.jpg')  # SM问题,识别时把其一融入,只有一个M
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000806.jpg')  # SM问题,识别时把其一融入,只有一个M
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000179.jpg')  # SM问题,识别时把其一融入,只有一个M
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000192.jpg')  # 漏字,未解决
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000434.jpg')  # SM问题
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000620.jpg')  # 小器字,识别成S问题
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/001110.jpg')  # 小器字,识别成S问题
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000385.jpg')  # 小器字,识别成S问题
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000291.jpg')  # 偏窄字,识别成S问题
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000387.jpg')  # 固字,没办法了
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000027.jpg')  # 小字未融合,未解决
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000620.jpg')  # 半边框
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000026.jpg')  # 左右结构中间断开字
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000152.jpg')  # 右框太多, S,M出错
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000230.jpg')  # 全是别成M,搁置
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000027.jpg')
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000018.jpg')
     # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/ER007_pure/20_19584_jpg/000024.jpg')
+    # pth = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000018.jpg'
     # test_char_detect_1('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000002.jpg')
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174_line8.png')  # 断行多
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174_line11.png')  # 断行多
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000755.jpg')  # list_bug
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000378.jpg')  # list_bug
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000752.jpg', dbg=True)  # list_bug
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/29_19457_jpg/000043.jpg', dbg=True)
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/29_19457_jpg/000064.jpg', dbg=True)  #  顺序问题
+    # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/29_19457_jpg/000127.jpg', dbg=True)  #  顺序问题
+    # test_one('/Users/Beyoung/Desktop/Projects/corpus/DingXiu/0A0CBAE0046F4AB7BCBFE12789547A78/000009.png')  #  顺序问题
+    test_one('/Users/Beyoung/Desktop/Projects/qianpai/book_pages/imgs_vertical/book_page_82.jpg', dbg=True)  #  顺序问题
+

@@ -234,6 +234,100 @@ def filter_subbox(cords, bigbox, minDot):
     ]
     return subboxes
 
+def con_line_boxes_two_point(boxes_list=[]):
+    # flag = True
+    flag1 = False
+    # boxes_list.sort(key=lambda pt:pt[0], reverse=True)
+    new_boxes_list = boxes_list
+    while flag1 == False:
+        if len(new_boxes_list) > 1:
+            for i in range(1, len(new_boxes_list)):
+                # for boxes in boxes_list:
+                _cord = xmin, ymin, xmax, ymax = int(new_boxes_list[i - 1][0]), int(new_boxes_list[i - 1][1]), int(
+                    new_boxes_list[i - 1][2]), int(new_boxes_list[i - 1][3])
+                # _cord = xmin, ymin, xmax, ymax = int(boxes_list[i][0]), int(boxes_list[i][1]), int(boxes_list[i][4]), int(boxes_list[i][5])
+                # for j in range(i, len(boxes_list)):
+                #     if not j == i:
+                _cord_next = xmin2, ymin2, xmax2, ymax2 = int(new_boxes_list[i][0]), int(new_boxes_list[i][1]), int(
+                    new_boxes_list[i][2]), int(new_boxes_list[i][3])
+                # _cord_next = xmin2, ymin2, xmax2, ymax2 = int(boxes_list[j][0]), int(boxes_list[j][1]), int(boxes_list[j][4]), int(boxes_list[j][5])
+                if (abs(xmin2 - xmin) < 25) and (abs(xmax2 - xmax) < 25) \
+                        and ((abs(ymin2 - ymax) < 250) or (abs(ymax2 - ymax) < 250)):
+                    x1, x2, y1, y2 = min(xmin, xmin2), max(xmax, xmax2), min(ymin, ymin2), max(ymax, ymax2)  # 这里右边用min x
+                    new_box = [x1, y1, x2, y2]
+                    new_boxes_list.pop(i-1)
+                    new_boxes_list.pop(i-1)
+                    new_boxes_list.insert(i-1, new_box)
+                    flag1 = False
+                    break
+                else:
+                    flag1 = True
+                    # new_boxes_list.append(boxes_list[i - 1])
+                    # if flag:
+                    #     new_boxes_list.append(boxes_list[i - 1])
+                    # else:
+                    #     flag = True
+        else:
+            flag1 = True
+        # new_boxes_list.append(boxes_list[-1])
+
+    return new_boxes_list
+
+def check_two_boxes(box_1=[], box_2=[]):
+    '''
+    考虑阈值是否要调为150
+    :param box_1:
+    :param box_2:
+    :return:
+    '''
+    _cord1 = xmin1, ymin1, xmax1, ymax1 = int(box_1[0]), int(box_1[1]), int(box_1[2]), int(box_1[3])
+    _cord2 = xmin2, ymin2, xmax2, ymax2 = int(box_2[0]), int(box_2[1]), int(box_2[2]), int(box_2[3])
+    # _cord_next = xmin2, ymin2, xmax2, ymax2 = int(new_boxes_list[i][0]), int(new_boxes_list[i][1]), int(new_boxes_list[i][2]), int(new_boxes_list[i][3])
+    # _cord_next = xmin2, ymin2, xmax2, ymax2 = int(new_boxes_list[j][0]), int(new_boxes_list[j][1]), int(
+    #     new_boxes_list[j][2]), int(boxes_list[j][3])
+    if (abs(xmin2 - xmin1) < 23) and (abs(xmax2 - xmax1) < 23) \
+                    and ((abs(ymin2 - ymax1) < 80) or (abs(ymax2 - ymax1) < 80)):
+        x1, x2, y1, y2 = min(xmin1, xmin2), max(xmax1, xmax2), min(ymin1, ymin2), max(ymax1, ymax2)  # 这里右边用min x
+        return [True, x1, x2, y1, y2]
+    else:
+        return [False]
+    #         new_box = [x1, y1, x2, y2]
+    #         new_boxes_list.pop(j)
+    #         new_boxes_list.pop(i)
+    #         new_boxes_list.insert(i, new_box)
+
+
+def con_line_boxes_two_point_test(boxes_list=[]):
+    # boxes_list.sort(key=lambda pt:pt[0], reverse=True)
+    new_boxes_list = boxes_list
+    # new_boxes_list = []
+    if len(new_boxes_list) > 1:
+        flag_list = [1]
+        while sum(flag_list) > 0:
+            # box_u = sub_boxes[0]
+            # sub_boxes.remove(box_u)
+            # box_u = boxes_list.pop(0)
+            inter_u = []
+            flag_list = []
+            for i in range(len(new_boxes_list) - 1):
+                for j in range(i + 1, len(new_boxes_list)):
+                    # if j == i:
+                    #     pass
+                    check_res = check_two_boxes(new_boxes_list[i], new_boxes_list[j])
+                    if check_res[0]:
+                        x1, x2, y1, y2 = check_res[1], check_res[2], check_res[3], check_res[4]
+                        new_box = [x1, y1, x2, y2]
+                        boxes_list.pop(j)
+                        boxes_list.pop(i)
+                        new_boxes_list.insert(i, new_box)
+                        flag_list.append(1)
+                        break
+                    else:
+                        flag_list.append(0)
+
+    return new_boxes_list
+
+
 def union_2box(box1, box2, cords_db):
     #合并两个相交的box
     xmin1, ymin1, xmax1, ymax1 = box1[0], box1[1], box1[2], box1[3]
@@ -264,13 +358,11 @@ def union_2box(box1, box2, cords_db):
 
 def union_subboxes(sub_boxes, cords_db, minDot, URatio=0.6):
     # print(sub_boxes)
+    # sub_boxes.sort(key=lambda pt:pt[0], reverse=True)
     sub_boxes.sort(key=lambda pt:pt[1])
-    # print(sub_boxes)
-    # pth_img = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/000174.jpg'
-    # pth_img_rect = '/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/20_19584_jpg/output/000174rec.jpg'
-    # _sub_boxes = [[b[0], b[1], b[2], b[1], b[2], b[3], b[0], b[3]] for b in sub_boxes]
-    # pth_img_ubox = pth_img_rect.replace('rec.jpg', 'rec_ubox_after_sort.jpg')
-    # draw_box(_sub_boxes, pth_img, pth_img_ubox, color=(0, 128, 0), seqnum=True, thickness=1,text='0')
+    sub_boxes = con_line_boxes_two_point_test(sub_boxes)
+    # sub_boxes = con_line_boxes_two_point(sub_boxes)
+    # sub_boxes = con_line_boxes_two_point(sub_boxes)
     boxes_union = []
     while len(sub_boxes)>0:
         # box_u = sub_boxes[0]
@@ -383,6 +475,7 @@ def get_w_rngs(widths, R=0.04):
     w_rngs.append(w_rng)
     return w_rngs
 
+# 判断返回哪一个
 def get_line_size(w_rngs, w):
     sizes = ['S','M','L','XL','XXL','XXXL']
     l_sizes = len(sizes)
@@ -501,7 +594,7 @@ def concat_boxes(res4api_detect_line, res4api_detect_line_db, pth_img='', dbg=Fa
     H_AVG = np.mean([cord[-2] for cord in cords_orig_])
     # 改变初始过滤策略:过滤交叉>=3的框 -- BEGIN
     # cords_orig_ = [ cord for cord in cords_orig_ if cord[-1]<=RATIO_WH_FILTER and cord[-2]>W_AVG]
-    cords_orig_ = [ cord for cord in cords_orig_ if cord[-1]<=RATIO_WH_FILTER]
+    # cords_orig_ = [ cord for cord in cords_orig_ if cord[-1]<=RATIO_WH_FILTER]
 
     # if dbg and not pth_img=='':
     if not pth_img=='':
