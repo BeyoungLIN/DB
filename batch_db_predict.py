@@ -191,10 +191,11 @@ def init_read_ckpt(ckpt_pth, combine=1, new_ckpt_pth=''):
 
 
 def read_ckpt_list(ckpt_txt_list):
-    = []
+    done_list = []
     for one_txt in ckpt_txt_list:
-        read_todo_file(one_txt)
-    return ckpt_list,
+        one_txt_done_list = read_todo_file(one_txt)
+        done_list += one_txt_done_list
+    return ckpt_list
 
 
 IMG_EXT = {'.jpg', '.png', '.tif', '.tiff', '.bmp', '.gif'}
