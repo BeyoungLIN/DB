@@ -239,7 +239,7 @@ url_line_detect = 'http://api.chinesenlp.com:7001/ocr/v1/line_detect'
 url_line_recog = 'http://api.chinesenlp.com:7001/ocr/v1/line_recog'
 
 url_page_recog_0 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_0'  # craft_char
-url_page_recog = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog'  # craft行
+url_page_recog = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog'  # craft行 + db
 url_page_recog_1 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_1'  # db
 
 

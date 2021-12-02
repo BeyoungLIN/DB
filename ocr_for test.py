@@ -88,19 +88,36 @@ if __name__ == '__main__':
         # '/disks/sde/beyoung/files_processor/6059.桐南凤岗李氏宗谱：三十二卷：[桐庐]',
         # '/disks/sdd/beyoung/data/pkuocrtest-20210705',
         # '/disks/sdd/beyoung/data/經問卷一',
-        '/disks/sdb/euphoria/DB/datasets/ER007/ER007_jpg',
+        # '/disks/sdb/euphoria/DB/datasets/ER007/ER007_jpg',
+        '/Users/Beyoung/Desktop/Projects/corpus/00025的副本1500',
+
     ]
 
-    process(root_list, 'double')
+    # process(root_list, 'double')
     # process(root_list, 'single')
     # copy_file(root_list, 'single')
-    copy_file(root_list, 'double')
+    # copy_file(root_list, 'double')
 
     # get_double_folder_linesize(root_path)
     # single_file = '/disks/sdd/beyoung/data/ZHSY000116-000009_gray.png'
     # single_file = '/disks/sdd/beyoung/data/ZHSY000116-000009_rem_red.png'
     # single_file = '/disks/sdd/beyoung/data/error/IMG_20210414_141531.jpg'
     # single_file = '/disks/sdb/euphoria/DB/datasets/ER007/001029.jpg'
-    # ajust_boxes(single_file, dbg=False)
-    # test_one_adv(single_file, mod='adv')
-    # test_one_adv(single_file, mod='mix')
+    # single_file = '/disks/sdb/euphoria/DB/datasets/ER007/001029.jpg'
+    # single_file = '/Users/Beyoung/Desktop/Projects/corpus/00025的副本1500/ZHSY000025-000296.tif'
+    single_file_list = [
+        # '/Users/Beyoung/Desktop/Projects/corpus/00025的副本1500/ZHSY000025-000296.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/00025的副本1500/ZHSY000025-000296的副本.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000296的副本_contrast.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000296_contrast.tif',
+        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000296.tif',
+        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000269.tif',
+        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000265.tif',
+        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000261.tif',
+        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000258.tif',
+        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000243.tif',
+    ]
+    for single_file in single_file_list:
+        ajust_boxes(single_file, dbg=False)
+        # test_one_adv(single_file, mod='adv')
+        # test_one_adv(single_file, mod='mix')
