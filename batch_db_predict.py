@@ -191,6 +191,9 @@ def init_read_ckpt(ckpt_pth, combine=1, new_ckpt_pth=''):
 
 
 def read_ckpt_list(ckpt_txt_list):
+    = []
+    for one_txt in ckpt_txt_list:
+        read_todo_file(one_txt)
     return ckpt_list,
 
 
