@@ -6,6 +6,94 @@
 
 import os
 import cv2
+import argparse
+
+import time
+
+import math
+import torch
+import numpy as np
+import itertools
+
+from experiment import Structure, Experiment
+from concern.config import Configurable, Config
+import utils
+
+from special_demo import Demo
+
+# CUDA_VISIBLE_DEVICES = 1
+os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+
+
+def run_db_model(folder_ip_pth_, folder_op_pth_):
+    parser = argparse.ArgumentParser(description='Text Recognition Training')
+    # parser.add_argument('exp', default='experiments/seg_detector/fakepages_resnet50_deform_thre.yaml', type=str)
+    # parser.add_argument('--resume', type=str, help='Resume from checkpoint')
+    # parser.add_argument('--image_path', type=str, help='image path')
+    # parser.add_argument('--data', type=str,
+    #                     help='The name of dataloader which will be evaluated on.')
+    # parser.add_argument('--image_short_side', type=int, default=736,
+    #                     help='The threshold to replace it in the representers')
+    # parser.add_argument('--result_dir', type=str, default='./demo_results/', help='path to save results')
+    # parser.add_argument('--thresh', type=float,
+    #                     help='The threshold to replace it in the representers')
+    # parser.add_argument('--box_thresh', type=float, default=0.6,
+    #                     help='The threshold to replace it in the representers')
+    # parser.add_argument('--visualize', action='store_true',
+    #                     help='visualize maps in tensorboard', default=True)
+    # parser.add_argument('--resize', action='store_true',
+    #                     help='resize')
+    # parser.add_argument('--polygon', action='store_true',
+    #                     help='output polygons if true')
+    # parser.add_argument('--eager', '--eager_show', action='store_true', dest='eager_show',
+    #                     help='Show images eagerly')
+    # parser.add_argument('--sort_boxes', action='store_true', dest='sort_boxes',
+    #                     help='Sort boxes for further works', default=True)
+
+    args = parser.parse_args()
+    args = vars(args)
+    args = {k: v for k, v in args.items() if v is not None}
+
+    args['exp'] = 'experiments/seg_detector/fakepages_resnet50_deform_thre.yaml'
+    args['image_path'] = folder_ip_pth_
+    args['result_dir'] = folder_op_pth_
+    args['resume'] = 'models/fakepage_res50_iter2.bin'
+    args['visualize'] = 1
+    args['sort_boxes'] = 0.6
+    args['sort_boxes'] = 1
+
+    # '--image_path ' + folder_ip_pth_ + '/ \\\ \\\n--result_dir ' + folder_op_pth_ + '/ \\\n--resume \\\nmodels/fakepage_res50_iter2.bin\\\n'
+
+    conf = Config()
+    experiment_args = conf.compile(conf.load(args['exp']))['Experiment']
+    experiment_args.update(cmd=args)
+    # Delete train settings, prevent of reading training dataset
+    experiment_args.pop('train')
+    experiment_args.pop('evaluation')
+    experiment_args.pop('validation')
+    experiment = Configurable.construct_class_from_config(experiment_args)
+
+    demo_handler = Demo(experiment, experiment_args, cmd=args)
+    error_pic = []
+
+    if os.path.isdir(args['image_path']):
+        img_cnt = len(os.listdir(args['image_path']))
+        for idx, img in enumerate(os.listdir(args['image_path'])):
+            if os.path.splitext(img)[1].lower() not in ['.jpg', '.tif', '.png', '.jpeg', '.gif']:
+                continue
+            t = time.time()
+            try:
+                demo_handler.inference(os.path.join(args['image_path'], img), args['visualize'])
+            except:
+                error_pic.append(img)
+
+            print("{}/{} elapsed time : {:.4f}s".format(idx + 1, img_cnt, time.time() - t))
+    else:
+        t = time.time()
+        demo_handler.inference(args['image_path'], args['visualize'])
+        print("elapsed time : {}s".format(time.time() - t))
+    print(error_pic)
+
 
 def get_pure_box(file_pth):
     '''
@@ -42,6 +130,8 @@ def get_file_box(file_pth):
 
 def lengthen_box(boxes_list, ratio):
     '''
+    :param boxes_list:
+    :param ratio:
     :return: 延长某几条线的new_box
     '''
     new_box = []
@@ -144,6 +234,7 @@ def get_db_res(ori_folder, res_folder):
         os.mkdir(res_folder)
     # 对该文件夹做预测
     run_predict_sh(ori_folder, res_folder)
+    # run_db_model(ori_folder, res_folder)
 
 
 def lengthen_res_visualize(vs_root, dir_name, pic_pth, boxes):
@@ -190,38 +281,64 @@ def init_read_ckpt(ckpt_pth, combine=1, new_ckpt_pth=''):
     return tmp, ckpt2list, new_ckpt_pth
 
 
-def read_ckpt_list(ckpt_txt_list):
-    done_list = []
+def read_ckpt_list(ckpt_txt_list, mod='update', new_ckpt_pth=''):
+    ckpt_list = []
+    if not os.path.exists(ckpt_txt_list[-1]):
+        with open(new_ckpt_pth, 'w', encoding='utf-8') as blank_txt:
+            blank_txt.close()
+    # if mod == 'update':
+    #     new_ckpt_pth = ckpt_txt_list[-1]
+    # elif mod == 'newbatch':
+    #     if new_ckpt_pth == '':
+    #         new_ckpt_pth = ckpt_txt_list[-1]
+    #     with open(new_ckpt_pth, 'w', encoding='utf-8') as blank_txt:
+    #         blank_txt.close()
+    new_ckpt_pth = ckpt_txt_list[-1]
     for one_txt in ckpt_txt_list:
         one_txt_done_list = read_todo_file(one_txt)
-        done_list += one_txt_done_list
-    return ckpt_list
+        ckpt_list += one_txt_done_list
+    tmp = []
+    print(tmp[:-50] if len(tmp) > 51 else tmp)
+
+    return tmp, ckpt_list, new_ckpt_pth
 
 
 IMG_EXT = {'.jpg', '.png', '.tif', '.tiff', '.bmp', '.gif'}
-root = '/disks/sde/euphoria/datasets/DingXiu/'
-db_res_root = '/disks/sde/euphoria/datasets/DingXiu_test/'
-visualize_root = '/disks/sde/euphoria/datasets/DingXiu_检查拉伸比例'  # 输出可视化图片可以检查
+root = '/disks/sdg/euphoria/datasets/DingXiu/'
+db_res_root = '/disks/sdg/euphoria/datasets/DingXiu_test/'
+visualize_root = '/disks/sdg/euphoria/datasets/DingXiu_检查拉伸比例'  # 输出可视化图片可以检查
 # 初始化并读取已完成的文件列表
 done_dir_txt_list = [
-    '/disks/sdb/euphoria/pkg/seg_detector/extract/done_folder_1.txt',  # 第一批 x-12.1 2000
-    '/disks/sdb/euphoria/pkg/seg_detector/extract/done_folder_2.txt',  # 第二批 12.2-
+    # '/disks/sdb/euphoria/pkg/seg_detector/extract/done_folder_1.txt',  # 第一批 x-12.1 2000
+    # '/disks/sdb/euphoria/pkg/seg_detector/extract/done_folder_2.txt',  # 第二批 12.2-
+    # '/disks/sdb/euphoria/pkg/seg_detector/extract/done_folder_3.txt',  # 第三批 12.20-1222
+    '/disks/sdb/euphoria/pkg/seg_detector/extract/done_folder_1222_1.txt',  # 第一批 12.22
 ]
+# finished_folder_tmp, finished_folder_list, new_finished_folder_pth = \
+    # read_ckpt_list(done_dir_txt_list, 'update')
+finished_folder_tmp, finished_folder_list, new_finished_folder_pth = \
+    read_ckpt_list(done_dir_txt_list)
+
 done_file_txt_list = [
-    '/disks/sdb/euphoria/deep-text-recognition-benchmark/extract/todo_list_1.txt',  # 第一批 x-12.1 60w
-    '/disks/sdb/euphoria/deep-text-recognition-benchmark/extract/todo_list_2.txt',  # 第二批 12.1-
+    # '/disks/sdb/euphoria/deep-text-recognition-benchmark/extract/todo_list_1.txt',  # 第一批 x-12.1 60w
+    # '/disks/sdb/euphoria/deep-text-recognition-benchmark/extract/todo_list_2.txt',  # 第二批 12.1-
+    # '/disks/sdb/euphoria/deep-text-recognition-benchmark/extract/todo_list_3.txt',  # 第三批 12.20-
+    '/disks/sdb/euphoria/deep-text-recognition-benchmark/extract/todo_list_1222_1.txt',  # 第一批 12.22
 ]
-finished_folder_pth = '/disks/sdb/euphoria/pkg/seg_detector/extract/done_folder_1201_combine.txt'
-finished_folder_tmp, finished_folder, new_finished_folder_pth = init_read_ckpt(finished_folder_pth, combine=1)
-done_file_pth = '/disks/sdb/euphoria/deep-text-recognition-benchmark/extract/todo_list_backup.txt'
-done_file_tmp, done_file, new_done_file_pth = init_read_ckpt(done_file_pth, combine=1)
+# done_file_tmp, done_file_list, new_done_file_pth = read_ckpt_list(done_file_txt_list, 'update')
+done_file_tmp, done_file_list, new_done_file_pth = read_ckpt_list(done_file_txt_list)
+
+# finished_folder_pth = '/disks/sdb/euphoria/pkg/seg_detector/extract/done_folder_1201_combine.txt'
+# finished_folder_tmp, finished_folder_list, new_finished_folder_pth = init_read_ckpt(finished_folder_pth, combine=1)
+# done_file_pth = '/disks/sdb/euphoria/deep-text-recognition-benchmark/extract/todo_list_backup.txt'
+# done_file_tmp, done_file_list, new_done_file_pth = init_read_ckpt(done_file_pth, combine=1)
 no_txt = []
 count = 0
 no_txt_flag = 0
 folder_names = os.listdir(root)  # DingXiu里面的所有文件名
 folder_names_copy = folder_names
 for folder_name in folder_names:
-    if folder_name not in (finished_folder + finished_folder_tmp):  # 不在两个列表内, 目前只收集文件名
+    if folder_name not in (finished_folder_list + finished_folder_tmp):  # 不在两个列表内, 目前只收集文件名
         folder_pth = os.path.join(root, folder_name)  # 原文件夹路径
         folder_db_res = os.path.join(db_res_root, folder_name)
         if os.path.isdir(folder_pth):
@@ -240,37 +357,41 @@ for folder_name in folder_names:
                     # 得到变换的坐标
                     if not os.path.exists(res_txt_pth):
                         res_txt_pth = new_txt_pth.replace('DingXiu_test', 'DingXiu')  # 不存在的情况下使用旧坐标
+                        db_res_pic_pth = os.path.join(folder_pth, file)
                         if not os.path.exists(res_txt_pth):
                             no_txt.append(res_txt_pth)
                             no_txt_flag = 1
 
                     if no_txt_flag == 0:
                         pic_boxes = get_pure_box(res_txt_pth)
-                        pic_boxes = lengthen_box(pic_boxes, 0.011)
+                        pic_boxes = lengthen_box(pic_boxes, 0.02)
                         # 保存原名txt,txt-size
                         sav_box_txt(pic_boxes, res_txt_pth=res_txt_pth, txt_sav_pth=new_txt_pth, txt_size_pth=new_txt_size_pth)
 
                         # 将txt文件夹复制到dingxiu文件夹中
                         common = 'cp ' + new_txt_pth + ' ' + new_txt_pth.replace('DingXiu_test', 'DingXiu')
                         os.system(common)
-                        # 可视化原图
-                        lengthen_res_visualize(visualize_root, folder_name, db_res_pic_pth, pic_boxes)
 
                         # 保留DingXiu路径的done_file 文件级png的append,用于后续creat_true_data
                         done_file_tmp.append(db_res_pic_pth.replace('DingXiu_test', 'DingXiu').replace('jpg', 'png'))  # 转为DingXiu路径, png格式
                         # 文件级的写入
-                        done_file_tmp, done_file = save_ckpt(tmp_list=done_file_tmp, saved_list=done_file, limit_num=10, op_txt_pth_=new_done_file_pth)  # tmp在前, 完整list在后
+                        done_file_tmp, done_file_list = save_ckpt(tmp_list=done_file_tmp, saved_list=done_file_list, limit_num=100, op_txt_pth_=new_done_file_pth)  # tmp在前, 完整list在后
                         count += 1
-                        if count % 2000 == 0:
+                        if count % 1000 == 0:
                             print('stage_count', count)
                             print(db_res_pic_pth)
+
+                            # 可视化原图   此处设计为每1000张检查一次
+                            # if not os.path.exists(db_res_pic_pth):
+                            #     db_res_pic_pth =
+                            lengthen_res_visualize(visualize_root, folder_name, db_res_pic_pth, pic_boxes)
                     else:
                         no_txt_flag = 0
                         print(no_txt)
 
                 # folder_pth 是文件夹才能做判断
             finished_folder_tmp.append(folder_name)
-            finished_folder_tmp, finished_folder = save_ckpt(tmp_list=finished_folder_tmp, saved_list=finished_folder, limit_num=10, op_txt_pth_=new_finished_folder_pth)
+            finished_folder_tmp, finished_folder_list = save_ckpt(tmp_list=finished_folder_tmp, saved_list=finished_folder_list, limit_num=10, op_txt_pth_=new_finished_folder_pth)
             # except Exception as e:
             #     print('错误类型是', e.__class__.__name__)
             #     print('错误明细是', e)

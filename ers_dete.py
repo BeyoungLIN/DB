@@ -1234,5 +1234,6 @@ if __name__ == '__main__':
     # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/29_19457_jpg/000064.jpg', dbg=True)  #  顺序问题
     # test_one('/Users/Beyoung/Desktop/Projects/ER/dataset/ER007/29_19457_jpg/000127.jpg', dbg=True)  #  顺序问题
     # test_one('/Users/Beyoung/Desktop/Projects/corpus/DingXiu/0A0CBAE0046F4AB7BCBFE12789547A78/000009.png')  #  顺序问题
-    test_one('/Users/Beyoung/Desktop/Projects/qianpai/book_pages/imgs_vertical/book_page_82.jpg', dbg=True)  #  顺序问题
+    # test_one('/Users/Beyoung/Desktop/Projects/qianpai/book_pages/imgs_vertical/book_page_82.jpg', dbg=True)  #  顺序问题
+    test_one('/Users/Beyoung/Desktop/Projects/corpus/diaolong/雕龙pic/道藏/D01C6C8C_D5B1_46AE_A16A_DEADF2A1846A/280418a.tif', dbg=True)  #  顺序问题
 

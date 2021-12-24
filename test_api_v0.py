@@ -644,6 +644,10 @@ def ajust_boxes(pth_img, dbg=False,only_craft=False):
     pth_img_rect = os.path.join(pth_sav_dir, filename + 'rec.jpg') if not '' == pth_img else ''
     pth_img_with_size = pth_img_rect.replace('rec.jpg', 'rec_uboxes_size.jpg')
     draw_box(uboxes_lurd, pth_img, pth_img_with_size, color=(0, 128, 0), thickness=2, seqnum=True)
+    print('# ' + pth_img.split('/')[-1])
+    for i,ub in enumerate(uboxes_g):
+        print(str([i, ub[0], ub[1], ub[2], ub[3]]) + ', ')
+    print()
     draw_box(bigboxes, pth_img_with_size, pth_img_with_size, color=(128, 0, 0), thickness=1, seqnum=True)
     # 输出带size的图
     for size, boxgrp in boxgrp_size.items():

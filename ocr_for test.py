@@ -42,9 +42,10 @@ def get_single_folder_linesize(root_dir):
         if os.path.splitext(file)[1].lower() in IMG_EXT:
             file_path = os.path.join(root_dir, file)
             # try:
+            # print(file_path)
             ajust_boxes(file_path, dbg=False)
             # test_one_adv(file_path, mod='adv')
-            test_one_adv(file_path, mod='mix')
+            # test_one_adv(file_path, mod='mix')
             flag += 1
                 # read_json_2txt(file_path[:-4] + '_resapi_mix.json.txt')
             # except:
@@ -89,12 +90,14 @@ if __name__ == '__main__':
         # '/disks/sdd/beyoung/data/pkuocrtest-20210705',
         # '/disks/sdd/beyoung/data/經問卷一',
         # '/disks/sdb/euphoria/DB/datasets/ER007/ER007_jpg',
-        '/Users/Beyoung/Desktop/Projects/corpus/00025的副本1500',
+        # '/Users/Beyoung/Desktop/Projects/corpus/00025的副本1500',
+        # '/Users/Beyoung/Desktop/Projects/corpus/diaolong/雕龙pic/道藏/0AD8983A_1FE2_4EBB_991E_9B78A8545AEE/',
+        '/Users/Beyoung/Desktop/Projects/oracle/src_img',
 
     ]
 
     # process(root_list, 'double')
-    # process(root_list, 'single')
+    process(root_list, 'single')
     # copy_file(root_list, 'single')
     # copy_file(root_list, 'double')
 
@@ -110,14 +113,15 @@ if __name__ == '__main__':
         # '/Users/Beyoung/Desktop/Projects/corpus/00025的副本1500/ZHSY000025-000296的副本.tif',
         # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000296的副本_contrast.tif',
         # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000296_contrast.tif',
-        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000296.tif',
-        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000269.tif',
-        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000265.tif',
-        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000261.tif',
-        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000258.tif',
-        '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000243.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000296.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000269.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000265.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000261.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000258.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/ZHSY000025-000296fortest/ZHSY000025-000243.tif',
+        # '/Users/Beyoung/Desktop/Projects/corpus/diaolong/雕龙pic/道藏/D01C6C8C_D5B1_46AE_A16A_DEADF2A1846A/280418a.tif',
     ]
     for single_file in single_file_list:
-        ajust_boxes(single_file, dbg=False)
-        # test_one_adv(single_file, mod='adv')
+        ajust_boxes(single_file, dbg=True)
+    #     test_one_adv(single_file, mod='adv', dbg)
         # test_one_adv(single_file, mod='mix')
