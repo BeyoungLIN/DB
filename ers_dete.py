@@ -31,6 +31,7 @@ url_line_recog = 'http://api.chinesenlp.com:7001/ocr/v1/line_recog'
 
 url_page_recog_0 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_0'  # craft_char
 url_page_recog = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog'  # craft行
+url_page_recog_cuhk = 'http://cuhk2021.chinesenlp.com:7001/ocr/v1/page_recog'  # cuhk_craft行
 url_page_recog_1 = 'http://api.chinesenlp.com:7001/ocr/v1/page_recog_1'  # db
 
 
@@ -163,6 +164,7 @@ def split(a):  # 获取各行起点和终点
     # print(end)  # [36, 73, 110, 147,184]
     return star, end
 
+
 def scan_vertical_shadow(img, img_bi):  # 垂直投影+分割
     # 1.垂直投影
     h, w = img_bi.shape
@@ -190,10 +192,10 @@ def bi_scan_box(mini_h, xmin, xmax, ymin, ymax, shadow_v):
     x_new = [xmin, xmax]
     w = xmax - xmin
     h = ymax - ymin
-    x_mid = int(w/2)
-    x_quarter = int(w/4)
-    x_eighth = int(w/8)
-    x_sixteenth = int(w/16)
+    x_mid = int(w / 2)
+    x_quarter = int(w / 4)
+    x_eighth = int(w / 8)
+    x_sixteenth = int(w / 16)
     count = 0
     direction = -1
     # while x_new[1] - x_new[0] <= 3 :
@@ -214,14 +216,14 @@ def bi_scan_box(mini_h, xmin, xmax, ymin, ymax, shadow_v):
         direction = 1
         count += 1
         # x_mid = int(x_mid / 2)
-    print(x_new)
+    # print(x_new)
     x1_new, x2_new = x_new[0], x_new[1]
     if x2_new - x1_new < mini_h:
         x1_new, x2_new = xmin, xmax
     return x1_new, x2_new
 
 
-def bi_scan_box_whole_pic(mini_h, xmin, xmax, ymin, ymax, shadow_v):
+def bi_scan_box_whole_pic(mini_h, xmin, xmax, ymin, ymax, shadow_v):  # using
     x_new = [xmin, xmax]
     # print('原始', x_new)
     w = xmax - xmin
@@ -234,7 +236,6 @@ def bi_scan_box_whole_pic(mini_h, xmin, xmax, ymin, ymax, shadow_v):
     direction = -1
     # while x_new[1] - x_new[0] <= 3 :
     while count < 2:
-        # for j in range(1 * x_eighth, 3 * x_quarter):
         for j in range(1 * x_eighth, 3 * x_quarter):
             line_sum = 0
             for k in range(ymin, ymax):
@@ -293,10 +294,12 @@ def box_scan_vertical(shadow_v, mini_h, xmin, xmax, ymin, ymax):  # 扫描得到
 
 
 # def scan_margin(boxes_list=[], ):
-def scan_minibox(boxes_list=[], img=''):
+def scan_minibox(boxes_list=[], img=Image.Image):
     # 读取要被切割的图片
-    img = cv2.imread(img)
-    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # img = cv2.imread(img)
+    # img = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+    img_gray = cv2.cvtColor(np.asarray(img), cv2.COLOR_BGR2GRAY)
+    # img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     thresh, img_bi = cv2.threshold(img_gray, 130, 255, cv2.THRESH_BINARY)
     shadow_v = img_bi.copy()
     h_list = []
@@ -364,7 +367,10 @@ def flat_box_processor(boxes_list=[]):
         w_h = w / h
         thres = 0.2
         '''
-        相关参考 109/65 = 1.67
+        相关参考
+        109/65 = 1.67
+        53 / 42 = 1.2619 # /Users/Beyoung/Desktop/Projects/corpus/一以问题收集/000094.jpg
+        w 159 / h 130  = 1.230
         '''
         if w_h > 1.6:
             # adjust_x = (w - h * thres) / 2  # 右边框一般会多出来一点, 稍微减去一点, 默认是框了两个字, 0.3 应该是阈值, 174图此处接近0.5
