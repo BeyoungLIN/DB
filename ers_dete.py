@@ -142,6 +142,7 @@ def draw_box(cords, pth_img, pth_img_rect, color=(0, 0, 255), resize_x=1.0, thic
         print(exc_type, e.__str__(), ',File', fname, ',line ', exc_tb.tb_lineno)
         traceback.print_exc()  # debug.error(e)
 
+
 def split(a):  # 获取各行起点和终点
     # b是a的非0元素的下标 组成的数组 (np格式),同时也是高度的值
     b = np.transpose(np.nonzero(a))
@@ -183,6 +184,7 @@ def scan_vertical_shadow(img, img_bi):  # 垂直投影+分割
             shadow_v[i, j] = 0  # 涂黑
 
     return a
+
 
 def bi_scan_box(mini_h, xmin, xmax, ymin, ymax, shadow_v):
     x_new = [xmin, xmax]
